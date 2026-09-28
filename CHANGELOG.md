@@ -297,11 +297,15 @@ upstream LibreHardwareMonitor this fork started from.
   follow-up feedback to just the device icon, once per group. Every row's
   name column is indented by the same icon-width gap whether or not that
   particular row draws an icon, so names stay aligned down the whole list
-  instead of only the icon row's name being pushed over - and the icon
-  itself is vertically centered against the row's actual rendered height
-  (including any user-dragged extra line spacing), not just the nominal
-  row height, so it doesn't end up hugging the top of a taller row. Built
-  and tested locally (both targets, 61/61) - not yet visually reconfirmed.
+  instead of only the icon row's name being pushed over. The icon is
+  vertically centered against the row's text (`_sensorLineHeight` alone) -
+  a user-dragged extra line-spacing gap (`extraPerStep`) only adds blank
+  space *below* the always-top-anchored text before the next row starts,
+  it never moves the text itself, so centering against the wider
+  row-plus-spacing slot (briefly tried and reverted the same day) would
+  have pulled the icon down away from the text instead of keeping it
+  beside it. Built and tested locally (both targets, 61/61) - not yet
+  visually reconfirmed.
 
 ### Changed
 - **Right-click menu redesign.** The gadget-wide section (always present,

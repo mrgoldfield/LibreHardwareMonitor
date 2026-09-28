@@ -2951,17 +2951,22 @@ public class SensorGadget : Gadget
                     {
                         if (isFirstSensorInGroup)
                         {
-                            // Fork fix: centered against the row's actual
-                            // rendered height (_sensorLineHeight +
-                            // extraPerStep), not just the nominal
-                            // _sensorLineHeight - a user who's dragged the
-                            // gadget taller (extraPerStep > 0, see
-                            // _lineSpacingManuallySet) adds that extra space
-                            // below y on every row, so centering against
-                            // _sensorLineHeight alone would leave the icon
-                            // sitting above center instead of in the middle
-                            // of the wider gap the user actually dragged in.
-                            int iconY = y + (_sensorLineHeight + extraPerStep - _iconSize) / 2;
+                            // Fork fix: centered against _sensorLineHeight
+                            // alone, not _sensorLineHeight + extraPerStep.
+                            // The row's text (DrawString below) is always
+                            // top-anchored at y - 1 with an auto-grow
+                            // height - extraPerStep only adds blank space
+                            // *below* that text before the next row starts
+                            // (see the vertical drag-to-resize feature), it
+                            // never moves the text itself. Centering
+                            // against the wider row+spacing slot pulled the
+                            // icon down into that blank gap, away from the
+                            // text it's meant to sit beside; centering
+                            // against just _sensorLineHeight keeps it
+                            // aligned with the actual text regardless of
+                            // how much extra spacing the user has dragged
+                            // in.
+                            int iconY = y + (_sensorLineHeight - _iconSize) / 2;
                             g.DrawImage(HardwareTypeImage.Instance.GetImage(hardware.HardwareType), new Rectangle(nameX - 1, iconY, _iconSize, _iconSize));
                         }
                         nameX += _iconSize + 1;
