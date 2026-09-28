@@ -53,18 +53,41 @@ jobs:
       # target-specific bug like a missing Math.Clamp overload wouldn't
       # show up if only one target ever compiled - just not uploaded,
       # since nobody's installed a net472 build from CI. retention-days
-      # keeps only the single artifact bounded
-      # instead of the default 90 days, now that there's just one per
-      # run instead of six (dropped LibreHardwareMonitorLib's separate
-      # x64/x86/ARM64 builds and the nupkg pack below - upstream ships
-      # those to NuGet, but this fork's own "Publish to NuGet" step was
-      # already gated to the upstream repo and never ran here, so
-      # building and uploading them was pure overhead for a fork that
-      # only ships the app itself, not the library standalone).
-      - name: Publish net10.0 application
+      # bounds each artifact instead of the default 90 days (dropped
+      # LibreHardwareMonitorLib's separate x64/x86/ARM64 builds and the
+      # nupkg pack below - upstream ships those to NuGet, but this fork's
+      # own "Publish to NuGet" step was already gated to the upstream
+      # repo and never ran here, so building and uploading them was pure
+      # overhead for a fork that only ships the app itself, not the
+      # library standalone).
+      #
+      # OutputPath now includes $(Platform) (LibreHardwareMonitor.Windows.Forms.csproj)
+      # - without it, this x64 build and the ARM64 one below would land
+      # in the same folder and silently overwrite each other.
+      - name: Publish net10.0 application (x64)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # 7.0.1
         with:
-          name: GoGoGadgetHardwareMonitor (.NET 10)
+          name: GoGoGadgetHardwareMonitor (.NET 10, x64)
           path: |
-            bin/Release/net10.0-windows
+            bin/Release/x64/net10.0-windows
+          retention-days: 30
+
+      # Fork addition: native ARM64 build, for Windows-on-ARM devices
+      # (Surface Pro X/11, Copilot+ PCs). Built for net10.0-windows only
+      # - .NET Framework 4.7.2 has no real native ARM64 runtime, so
+      # net472 stays x64-only (it already runs fine under Windows'
+      # x64 emulation on ARM64 anyway). A hardware monitor specifically
+      # benefits from a true native build here, unlike most apps: PawnIO
+      # (the kernel driver this app uses for sensor access) needs to
+      # match the actual CPU architecture - x64-emulated code can't
+      # necessarily read ARM64 hardware sensors correctly.
+      - name: Build application (ARM64)
+        run: dotnet build LibreHardwareMonitor.Windows.Forms\LibreHardwareMonitor.Windows.Forms.csproj -c Release --no-restore -p:Platform=ARM64 -f net10.0-windows
+
+      - name: Publish net10.0 application (ARM64)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # 7.0.1
+        with:
+          name: GoGoGadgetHardwareMonitor (.NET 10, ARM64)
+          path: |
+            bin/Release/ARM64/net10.0-windows
           retention-days: 30

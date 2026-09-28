@@ -13,7 +13,12 @@
     <ApplicationManifest>Resources\app.manifest</ApplicationManifest>
     <StartupObject>LibreHardwareMonitor.Windows.Forms.Program</StartupObject>
     <UseWindowsForms>true</UseWindowsForms>
-    <OutputPath>..\bin\$(Configuration)\</OutputPath>
+    <!-- Fork change: was ..\bin\$(Configuration)\ (no Platform segment) -
+         harmless while only x64 was ever built, but an ARM64 build
+         landed in the exact same folder and would silently overwrite
+         the x64 output before either got published. Matches
+         LibreHardwareMonitorLib's own OutputPath pattern. -->
+    <OutputPath>..\bin\$(Configuration)\$(Platform)\</OutputPath>
 	  <LangVersion>latest</LangVersion>
     <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
     <NoWarn>$(NoWarn);WFO1000</NoWarn>

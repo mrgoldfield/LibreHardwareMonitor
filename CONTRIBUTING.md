@@ -24,7 +24,9 @@ cd gogogadget
 dotnet build LibreHardwareMonitor.Windows.Forms\LibreHardwareMonitor.Windows.Forms.csproj -c Release -p:Platform=x64
 ```
 
-Output lands in `bin\Release\net10.0-windows\`.
+Output lands in `bin\Release\x64\net10.0-windows\` (swap `-p:Platform=x64`
+for `-p:Platform=ARM64` for a native Windows-on-ARM build, which lands in
+`bin\Release\ARM64\net10.0-windows\`).
 
 ## Where the gadget code lives
 
