@@ -2573,6 +2573,35 @@ public class SensorGadget : Gadget
         Size = new Size(width, y);
     }
 
+    // Fork addition (Row Icons): where to vertically place the device
+    // icon so it lines up with the row's actual text ink, not just the
+    // font's full line-height box. Two earlier attempts (centering
+    // against _sensorLineHeight + extraPerStep, then against
+    // _sensorLineHeight alone) both centered the icon within the full
+    // line box GDI+ reserves for DrawString - which includes descent
+    // space below the baseline for characters like g/y/p that a sensor's
+    // numeric value or name never uses, plus internal leading above the
+    // ascent - and the user reported the icon still sitting visibly
+    // above the text's actual ink both times. This instead centers
+    // against the font's ascent alone (FontFamily.GetCellAscent), which
+    // approximates the visible cap-height band digits/letters without
+    // descenders actually occupy - much closer to where the eye reads
+    // the text as being. Logged every time (DebugLog "RowIcons") so a
+    // next round, if this still isn't quite right, has real numbers to
+    // work from instead of another guess.
+    private int ComputeRowIconY(int y)
+    {
+        FontFamily family = _smallFont.FontFamily;
+        FontStyle style = _smallFont.Style;
+        int designAscent = family.GetCellAscent(style);
+        int designEmHeight = family.GetEmHeight(style);
+        double ascentPixels = _scaledFontSize * designAscent / designEmHeight;
+        int textVisualCenter = (y - 1) + (int)Math.Round(ascentPixels / 2);
+        int iconY = textVisualCenter - _iconSize / 2;
+        DebugLog.Write("RowIcons", $"ComputeRowIconY: y={y} scaledFontSize={_scaledFontSize} designAscent={designAscent} designEmHeight={designEmHeight} ascentPixels={ascentPixels} iconSize={_iconSize} sensorLineHeight={_sensorLineHeight} -> textVisualCenter={textVisualCenter} iconY={iconY}");
+        return iconY;
+    }
+
     private void DrawImageWidthBorder(Graphics g, int width, int height, Image back, int t, int b, int l, int r)
     {
         GraphicsUnit u = GraphicsUnit.Pixel;
@@ -3001,22 +3030,7 @@ public class SensorGadget : Gadget
                     {
                         if (isFirstSensorInGroup)
                         {
-                            // Fork fix: centered against _sensorLineHeight
-                            // alone, not _sensorLineHeight + extraPerStep.
-                            // The row's text (DrawString below) is always
-                            // top-anchored at y - 1 with an auto-grow
-                            // height - extraPerStep only adds blank space
-                            // *below* that text before the next row starts
-                            // (see the vertical drag-to-resize feature), it
-                            // never moves the text itself. Centering
-                            // against the wider row+spacing slot pulled the
-                            // icon down into that blank gap, away from the
-                            // text it's meant to sit beside; centering
-                            // against just _sensorLineHeight keeps it
-                            // aligned with the actual text regardless of
-                            // how much extra spacing the user has dragged
-                            // in.
-                            int iconY = y + (_sensorLineHeight - _iconSize) / 2;
+                            int iconY = ComputeRowIconY(y);
                             g.DrawImage(HardwareTypeImage.Instance.GetImage(hardware.HardwareType), new Rectangle(nameX - 1, iconY, _iconSize, _iconSize));
                         }
                         nameX += _iconSize + 1;

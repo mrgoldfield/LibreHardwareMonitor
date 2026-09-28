@@ -297,15 +297,21 @@ upstream LibreHardwareMonitor this fork started from.
   follow-up feedback to just the device icon, once per group. Every row's
   name column is indented by the same icon-width gap whether or not that
   particular row draws an icon, so names stay aligned down the whole list
-  instead of only the icon row's name being pushed over. The icon is
-  vertically centered against the row's text (`_sensorLineHeight` alone) -
-  a user-dragged extra line-spacing gap (`extraPerStep`) only adds blank
-  space *below* the always-top-anchored text before the next row starts,
-  it never moves the text itself, so centering against the wider
-  row-plus-spacing slot (briefly tried and reverted the same day) would
-  have pulled the icon down away from the text instead of keeping it
-  beside it. Built and tested locally (both targets, 61/61) - not yet
-  visually reconfirmed.
+  instead of only the icon row's name being pushed over. The icon's
+  vertical position went through three attempts the same day before
+  landing on `ComputeRowIconY`: centering against the full row+spacing
+  slot, then against `_sensorLineHeight` alone, both of which center the
+  icon within the *entire* line-height box `DrawString` reserves -
+  including descent space below the baseline for characters like g/y/p
+  that a sensor's number/name never actually uses, which visibly pulled
+  the icon above the text's real ink both times per user feedback.
+  `ComputeRowIconY` instead centers against the font's ascent alone
+  (`FontFamily.GetCellAscent`), approximating just the visible cap-height
+  band digits/letters without descenders actually occupy - much closer to
+  where the text reads as being. Logged every draw (`DebugLog` tag
+  "RowIcons") so a further round, if needed, has real numbers to work
+  from instead of another guess. Built and tested locally (both targets,
+  62/62) - not yet visually reconfirmed.
 - **Group Spacing.** Gadget right-click menu -> "Group Spacing..." opens a
   small dialog to set an optional extra gap, in raw pixels, drawn between
   each hardware group (CPU, RAM, Storage, ...) - on top of normal row
