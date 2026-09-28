@@ -239,15 +239,18 @@ public class SensorGadget : Gadget
     private readonly ToolStripMenuItem _scaleMenu = new ToolStripMenuItem("Scale");
 
     // Fork addition (Row Icons, user-requested 2026-09-28): a gadget-wide
-    // choice to prefix every sensor row's display name with its hardware-
-    // type icon (HardwareTypeImage - the same icon the hardware header row
-    // already shows once per group) followed by its sensor-category icon
-    // (SensorTypeImage - Load/Temperature/Fan/etc., the same set TypeNode
-    // uses in the main window's tree). "Icons Only" drops the text
-    // entirely instead of just prepending the icons, for users who'd
-    // rather recognize a row by icon than read its name. Off by default -
-    // a purely opt-in cosmetic change, like Mini Mode/gradient bar
-    // background before it.
+    // choice to mark the first sensor row of each hardware group with its
+    // hardware-type icon (HardwareTypeImage - the same icon the group's
+    // header row already shows, when Hardware Names is on). "First" is
+    // positional, not tied to a specific sensor - see isFirstSensorInGroup
+    // in OnPaint - so it follows Move Up/Move Down reordering
+    // automatically instead of sticking to whichever sensor happened to
+    // be first originally. "Icons Only" drops that one row's text name in
+    // favor of the icon, and - per explicit user choice, since rows past
+    // the first aren't meant to be individually identified in this mode -
+    // leaves every other row in the group with no name and no icon at
+    // all, not just the first. Off by default - a purely opt-in cosmetic
+    // change, like Mini Mode/gradient bar background before it.
     private enum RowIconMode
     {
         Off,
@@ -1840,13 +1843,11 @@ public class SensorGadget : Gadget
                     longestNameWidth = Math.Max(longestNameWidth, g.MeasureString(ResolveSensorDisplayName(_settings, sensor), _smallFont, int.MaxValue, StringFormat.GenericTypographic).Width);
             }
 
-            // Fork addition (Row Icons): a sensor row prepends two icons
-            // (device + category) when enabled, on top of the one icon
-            // width already budgeted above for the hardware header row -
-            // add room for the second one so Row Icons doesn't immediately
-            // truncate every name it's placed in front of.
-            int rowIconsWidth = _rowIconMode == RowIconMode.Off ? 0 : _iconSize + 1;
-            int nameSideWidth = _leftMargin + _iconSize + rowIconsWidth + (int)Math.Ceiling(longestNameWidth) + 4;
+            // Fork addition (Row Icons): only the first sensor row of each
+            // group gets a device icon, same as the hardware header row
+            // already does - the single _iconSize allowance below already
+            // covers that, no extra needed.
+            int nameSideWidth = _leftMargin + _iconSize + (int)Math.Ceiling(longestNameWidth) + 4;
             return Math.Max((int)Math.Round(17.3 * scaledFontSize), rightSideWidth + nameSideWidth);
         }
     }
@@ -2812,6 +2813,8 @@ public class SensorGadget : Gadget
                 if (list.Count == 0)
                     continue;
 
+                bool isFirstSensorInGroup = true;
+
                 if (HardwareNamesEnabled)
                 {
                     if (y > _topMargin)
@@ -2894,21 +2897,36 @@ public class SensorGadget : Gadget
                     }
 
                     int nameX = _leftMargin;
-                    if (_rowIconMode != RowIconMode.Off)
+
+                    // Fork addition (Row Icons): the device icon marks
+                    // only the first row of each hardware group - not
+                    // every row - so it reads as a group marker rather
+                    // than repeated clutter. "First" is positional
+                    // (isFirstSensorInGroup, reset per hardware group
+                    // below), not tied to a specific sensor identity, so
+                    // it automatically follows whichever sensor Move Up/
+                    // Move Down has sorted to the top of list via
+                    // gadget.order - no separate tracking needed.
+                    bool showIcon = _rowIconMode != RowIconMode.Off && isFirstSensorInGroup;
+                    if (showIcon)
                     {
                         int iconY = y + (_sensorLineHeight - _iconSize) / 2;
                         g.DrawImage(HardwareTypeImage.Instance.GetImage(hardware.HardwareType), new Rectangle(nameX - 1, iconY, _iconSize, _iconSize));
                         nameX += _iconSize + 1;
-                        g.DrawImage(SensorTypeImage.Instance.GetImage(sensor.SensorType), new Rectangle(nameX - 1, iconY, _iconSize, _iconSize));
-                        nameX += _iconSize + 1;
                     }
 
+                    // Icons Only: the device icon replaces the name on the
+                    // one row that has it; every other row in the group is
+                    // left with no name and no icon at all (user's explicit
+                    // choice - rows after the first aren't meant to be
+                    // individually identified in this mode).
                     remainingWidth -= nameX - _leftMargin + 2;
                     if (remainingWidth > 0 && _rowIconMode != RowIconMode.IconsOnly)
                     {
                         g.DrawString(ResolveSensorDisplayName(_settings, sensor), _smallFont, GetColorBrush(ResolveSensorNameColor(sensor)), new RectangleF(nameX - 1, y - 1, remainingWidth, 0), _trimStringFormat);
                     }
                     y += _sensorLineHeight + extraPerStep;
+                    isFirstSensorInGroup = false;
                 }
             }
 

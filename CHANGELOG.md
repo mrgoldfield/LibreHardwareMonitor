@@ -278,17 +278,24 @@ upstream LibreHardwareMonitor this fork started from.
   source pixels. Built and tested locally (both targets, 61/61) - not yet
   visually reconfirmed.
 - **Row Icons.** Gadget background right-click menu -> "Row Icons": Off /
-  "Icons + Name" / "Icons Only". When on, every sensor row is prefixed
-  with its hardware-type icon (`HardwareTypeImage` - the same icon the
-  hardware header row already shows once per group) followed by its
-  sensor-category icon (new `SensorTypeImage`, mirroring the
-  Load/Temperature/Fan/etc. icon set `TypeNode` already uses in the main
-  window's tree - no new art needed). "Icons Only" drops the row's text
-  name entirely instead of just prepending the icons, for a denser look.
-  Gadget-wide (`sensorGadget.RowIcons`), off by default, included in the
-  Theme-export allowlist (`ThemeProfileManager.ThemeKeys`) since it's
-  pure visual style. User-requested 2026-09-28. Built and tested locally
-  (both targets, 62/62) - not yet visually reconfirmed.
+  "Icons + Name" / "Icons Only". When on, the *first* sensor row of each
+  hardware group is marked with its hardware-type icon
+  (`HardwareTypeImage` - the same icon the group's own header row already
+  shows when Hardware Names is on); every other row in the group is left
+  as-is. "First" is positional (`isFirstSensorInGroup` in `OnPaint`), not
+  tied to a specific sensor, so it stays on whichever sensor Move Up/Move
+  Down has sorted to the top of the group instead of sticking to whichever
+  one happened to be first originally. "Icons Only" drops that one row's
+  text name in favor of the icon, and - per explicit user choice - every
+  other row in the group is left with no name and no icon at all, not
+  just the first (rows past the first aren't meant to be individually
+  identified in this mode). Gadget-wide (`sensorGadget.RowIcons`), off by
+  default, included in the Theme-export allowlist
+  (`ThemeProfileManager.ThemeKeys`) since it's pure visual style.
+  User-requested 2026-09-28 - initially shipped as an icon on every row
+  (device icon + a sensor-category icon), narrowed the same day per
+  follow-up feedback to just the device icon, once per group. Built and
+  tested locally (both targets, 61/61) - not yet visually reconfirmed.
 
 ### Fixed
 - Two dialogs (`GradientThresholdDialog`, `DisplayNameDialog`) had a
