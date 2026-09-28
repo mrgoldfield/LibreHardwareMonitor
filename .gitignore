@@ -1,0 +1,16 @@
+*.user
+*.suo
+[Bb]in/
+[Oo]bj/
+.idea/
+.vs/
+.vscode/
+packages/
+
+# AI-assisted development working notes, not meant to be published:
+# per-session instructions/status, the original fork plan/design
+# rationale, and Claude/Gemini collaboration mail files.
+CLAUDE.md
+PLAN.md
+from_claude_to_gemini.md
+from_gemini_to_claude.md
