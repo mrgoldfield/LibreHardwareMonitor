@@ -248,6 +248,18 @@ upstream LibreHardwareMonitor this fork started from.
     has already run.
   - Built and tested locally (both targets, 61/61) - not yet visually
     reconfirmed.
+- **Context menu now names what it's about to modify.** Right-clicking a
+  sensor row shows "Device: <hardware.Name>" and "Sensor: <sensor.Name>"
+  (both grayed-out, unclickable) at the very top, above Move Up/Down and
+  everything else; right-clicking a hardware header row shows just the
+  device line. Deliberately the sensor's/hardware's *real* name
+  (`ISensor.Name`/`IHardware.Name`), never `ResolveSensorDisplayName`'s
+  gadget-only override, so it stays useful as a "what is this actually"
+  readout even after a custom Display Name no longer resembles it.
+  User-requested 2026-09-28, to make it obvious what's being edited
+  before clicking further into Bar/Text/Name Color, Gradient, Value
+  Display, etc. Built and tested locally (both targets, 61/61) - not yet
+  visually reconfirmed.
 
 ### Fixed
 - Two dialogs (`GradientThresholdDialog`, `DisplayNameDialog`) had a

@@ -157,6 +157,20 @@ public class SensorGadget : Gadget
     private readonly ToolStripMenuItem _moveGroupUpItem = new ToolStripMenuItem("Move Group Up");
     private readonly ToolStripMenuItem _moveGroupDownItem = new ToolStripMenuItem("Move Group Down");
     private readonly ToolStripSeparator _sensorMenuSeparator = new ToolStripSeparator();
+
+    // Fork addition: a non-clickable header at the very top of the
+    // per-row context menu naming exactly what's about to be modified -
+    // deliberately the sensor's/hardware's real name (ISensor.Name/
+    // IHardware.Name), never ResolveSensorDisplayName's gadget-only
+    // override, so this stays a reliable "what is this really" readout
+    // even when a custom Display Name no longer resembles it. Enabled=
+    // false (grayed out, unclickable) rather than a ToolStripLabel -
+    // simpler to keep looking consistent with the rest of this
+    // ContextMenuStrip's rendering (Theme/ThemedToolStripRenderer etc.)
+    // without a second control type to theme.
+    private readonly ToolStripMenuItem _contextMenuDeviceItem = new ToolStripMenuItem { Enabled = false };
+    private readonly ToolStripMenuItem _contextMenuSensorItem = new ToolStripMenuItem { Enabled = false };
+    private readonly ToolStripSeparator _contextMenuInfoSeparator = new ToolStripSeparator();
     private IHardware _contextMenuHardware;
 
     // Fork addition (Phase 2/3 - per-sensor color/gradient): "Bar Color"
@@ -1272,6 +1286,9 @@ public class SensorGadget : Gadget
         ContextMenuStrip.Items.Remove(_moveGroupUpItem);
         ContextMenuStrip.Items.Remove(_moveGroupDownItem);
         ContextMenuStrip.Items.Remove(_sensorMenuSeparator);
+        ContextMenuStrip.Items.Remove(_contextMenuDeviceItem);
+        ContextMenuStrip.Items.Remove(_contextMenuSensorItem);
+        ContextMenuStrip.Items.Remove(_contextMenuInfoSeparator);
 
         if (_contextMenuHardware != null)
         {
@@ -1284,6 +1301,9 @@ public class SensorGadget : Gadget
             ContextMenuStrip.Items.Insert(0, _sensorMenuSeparator);
             ContextMenuStrip.Items.Insert(0, _moveGroupDownItem);
             ContextMenuStrip.Items.Insert(0, _moveGroupUpItem);
+            ContextMenuStrip.Items.Insert(0, _contextMenuInfoSeparator);
+            _contextMenuDeviceItem.Text = "Device: " + _contextMenuHardware.Name;
+            ContextMenuStrip.Items.Insert(0, _contextMenuDeviceItem);
             return;
         }
 
@@ -1332,6 +1352,12 @@ public class SensorGadget : Gadget
         ContextMenuStrip.Items.Insert(0, _barColorItem);
         ContextMenuStrip.Items.Insert(0, _moveDownItem);
         ContextMenuStrip.Items.Insert(0, _moveUpItem);
+
+        ContextMenuStrip.Items.Insert(0, _contextMenuInfoSeparator);
+        _contextMenuSensorItem.Text = "Sensor: " + _contextMenuSensor.Name;
+        ContextMenuStrip.Items.Insert(0, _contextMenuSensorItem);
+        _contextMenuDeviceItem.Text = "Device: " + _contextMenuSensor.Hardware.Name;
+        ContextMenuStrip.Items.Insert(0, _contextMenuDeviceItem);
     }
 
     // Fork addition (Value Display): the sensor types that render as a
