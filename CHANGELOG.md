@@ -298,24 +298,26 @@ upstream LibreHardwareMonitor this fork started from.
   name column is indented by the same icon-width gap whether or not that
   particular row draws an icon, so names stay aligned down the whole list
   instead of only the icon row's name being pushed over. The icon's
-  size/position went through four attempts the same day, the last three
-  still visibly wrong per user screenshots: centering the header row's
-  icon size (`_iconSize`, 1.5x font size - sized for the taller
+  size/position went through five attempts the same day before settling
+  on real pixel measurement instead of guessing from font metrics:
+  centering the header row's icon size (`_iconSize`, sized for the taller
   `_hardwareLineHeight`) against the full row+spacing slot, then against
-  `_sensorLineHeight` alone, then against just the font's ascent
-  (`FontFamily.GetCellAscent`) - all three still centered a fixed
-  `_iconSize`-sized icon, and `_iconSize` (~1.5x scaledFontSize) turned
-  out to be nearly as tall as `_sensorLineHeight` itself (~1.55x) -
-  diagnostic logging (`DebugLog` tag "RowIcons", added on the third
-  attempt) confirmed this directly: the computed Y went negative for the
-  first row, meaning the icon had nowhere to fit without clipping no
-  matter which point it centered on. The actual fix: a dedicated,
-  smaller row-icon size derived from the ascent itself
-  (`ComputeRowIconSize`/`ComputeRowIconLayout`) instead of reusing
-  `_iconSize` (which stays used for the header row, unaffected) - sized
-  and centered on the same ascent band, so it actually fits the tighter
-  sensor row with room to center. Built and tested locally (both targets,
-  62/62) - not yet visually reconfirmed.
+  `_sensorLineHeight` alone, then against the font's ascent alone
+  (`FontFamily.GetCellAscent`), then a dedicated smaller icon size
+  derived from that same ascent - each one still visibly wrong per user
+  screenshots. Diagnostic logging (`DebugLog` tag "RowIcons", added
+  partway through) showed why the ascent-sized attempt still left a
+  visible gap: `GetCellAscent`'s design metric reserves headroom for
+  diacritics no digit or "%" glyph ever uses, so even "the ascent band"
+  isn't quite where a plain digit's ink actually starts. The final fix
+  (`MeasureTextInk`) sidesteps font-metric guessing entirely: it renders
+  a representative string exactly the way row text does, onto an
+  offscreen bitmap, then scans the pixels for the real topmost/bottommost
+  ink row - `ComputeRowIconSize`/`ComputeRowIconLayout` now derive the
+  device icon's size and vertical center from that measurement, cached
+  per font-size/Scale change rather than recomputed every paint.
+  `_iconSize` stays used unchanged for the header row. Built and tested
+  locally (both targets, 62/62) - not yet visually reconfirmed.
 - **Group Spacing.** Gadget right-click menu -> "Group Spacing..." opens a
   small dialog to set an optional extra gap, in raw pixels, drawn between
   each hardware group (CPU, RAM, Storage, ...) - on top of normal row

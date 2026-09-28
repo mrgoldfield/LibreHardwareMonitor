@@ -60,6 +60,16 @@ public class SensorGadget : Gadget
     private float _fontSize;
     private double _scaledFontSize;
 
+    // Fork addition (Row Icons vertical alignment): where a row's actual
+    // rendered text ink sits, measured directly rather than approximated
+    // from font metrics - see MeasureTextInk. _textInkCenterOffset is in
+    // pixels below the same y - 1 reference DrawString itself uses for
+    // row text (see OnPaint); _textInkHeight is the ink's own pixel
+    // height, used to size the Row Icons device icon so it matches the
+    // text it sits beside instead of a separately-guessed size.
+    private double _textInkCenterOffset;
+    private int _textInkHeight;
+
     // Fork addition: true once the user has actually dragged the
     // gadget's right edge (see GadgetWindow.UserResized) - persisted so
     // a manually-chosen width survives a restart. Until then, Resize()
@@ -1850,6 +1860,7 @@ public class SensorGadget : Gadget
         _scaledFontSize = scaledFontSize;
         _largeFont = CreateFont((float)scaledFontSize, FontStyle.Bold);
         _smallFont = CreateFont((float)scaledFontSize, FontStyle.Regular);
+        MeasureTextInk();
 
         _iconSize = (int)Math.Round(1.5 * scaledFontSize);
         // Fork fix: upstream's 1.66x/1.33x ratios read as cramped now
@@ -1912,11 +1923,12 @@ public class SensorGadget : Gadget
             }
 
             // Fork addition (Row Icons): only the first sensor row of each
-            // group gets a device icon, sized from the font's ascent (see
-            // ComputeRowIconSize) - always smaller than _iconSize (the
-            // header row's icon, sized for its taller _hardwareLineHeight)
-            // - so the single _iconSize allowance below already covers it
-            // too, no extra needed.
+            // group gets a device icon, sized from the row text's actual
+            // measured ink height (see MeasureTextInk/ComputeRowIconSize)
+            // - always smaller than _iconSize (the header row's icon,
+            // sized for its taller _hardwareLineHeight) - so the single
+            // _iconSize allowance below already covers it too, no extra
+            // needed.
             int nameSideWidth = _leftMargin + _iconSize + (int)Math.Ceiling(longestNameWidth) + 4;
             return Math.Max((int)Math.Round(17.3 * scaledFontSize), rightSideWidth + nameSideWidth);
         }
@@ -2575,56 +2587,110 @@ public class SensorGadget : Gadget
         Size = new Size(width, y);
     }
 
-    // Fork addition (Row Icons): the device icon's own size and vertical
-    // position for a sensor row, computed together since they depend on
-    // the same font metric. Three earlier attempts at just the Y
-    // position (centering _iconSize - the header row's icon size,
-    // 1.5x scaledFontSize - against _sensorLineHeight + extraPerStep,
-    // then against _sensorLineHeight alone, then against the font's
-    // ascent alone) all still looked wrong per user feedback, and the
-    // DebugLog output from the third attempt showed why: _iconSize
-    // (~1.5x scaledFontSize) is nearly as tall as _sensorLineHeight
-    // itself (~1.55x) - there's only ~3% of the row left as slack, nowhere
-    // near enough room to visually offset a same-sized icon to align with
-    // the font's much shorter ascent band (~1.08x scaledFontSize) without
-    // it clipping above the row (confirmed: iconY came out negative for
-    // the very first row). _iconSize was always sized for the *header*
-    // row (_hardwareLineHeight, ~1.9x scaledFontSize, plenty of slack for
-    // a 1.5x icon) - reusing it for the much tighter sensor row was the
-    // actual root cause, not the choice of vertical anchor. This instead
-    // sizes the row icon from the ascent itself (FontFamily.GetCellAscent),
-    // so it fits the row with room to actually center, and centers it on
-    // that same ascent band (approximating the visible cap-height digits/
-    // letters without descenders occupy, not the font's full line-height
-    // box which reserves unused descent space below the baseline).
-    // Logged every time (DebugLog "RowIcons") so a further round, if
-    // needed, has real numbers instead of another guess.
-    private double ComputeAscentPixels()
+    // Fork addition (Row Icons vertical alignment): renders a
+    // representative string exactly the way OnPaint's row text does,
+    // then scans the resulting pixels for the topmost/bottommost row
+    // that actually contains ink, to find _textInkCenterOffset/
+    // _textInkHeight. Three earlier attempts approximated this from font
+    // metrics instead (centering _iconSize - the header row's icon size,
+    // sized for the taller _hardwareLineHeight - against
+    // _sensorLineHeight + extraPerStep, then against _sensorLineHeight
+    // alone, then a dedicated smaller icon size against the font's
+    // ascent alone via FontFamily.GetCellAscent) and each one still
+    // looked visibly wrong per user screenshots - the last one left a
+    // gap because GetCellAscent's design metric reserves headroom for
+    // diacritics no digit or "%" glyph ever uses, so even "the ascent
+    // band" isn't quite where a plain digit's ink actually starts.
+    // Measuring the real rendered pixels sidesteps guessing at font
+    // metric semantics entirely. Called once per font-size/Scale change
+    // (see SetFontSize), not per paint - cheap relative to how rarely it
+    // runs, and every consumer below just reads the cached fields.
+    private void MeasureTextInk()
     {
-        FontFamily family = _smallFont.FontFamily;
-        FontStyle style = _smallFont.Style;
-        int designAscent = family.GetCellAscent(style);
-        int designEmHeight = family.GetEmHeight(style);
-        return _scaledFontSize * designAscent / designEmHeight;
+        const string sample = "0123456789 %";
+        int width = Math.Max(1, (int)Math.Ceiling(_scaledFontSize * sample.Length));
+        int height = Math.Max(1, (int)Math.Ceiling(_scaledFontSize * 3));
+
+        using (Bitmap bmp = new Bitmap(width, height, PixelFormat.Format32bppArgb))
+        {
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.Black);
+                using (Brush brush = new SolidBrush(Color.White))
+                    g.DrawString(sample, _smallFont, brush, new RectangleF(0, 0, width, 0), _stringFormat);
+            }
+
+            Rectangle rect = new Rectangle(0, 0, width, height);
+            BitmapData data = bmp.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try
+            {
+                int stride = data.Stride;
+                byte[] buffer = new byte[stride * height];
+                Marshal.Copy(data.Scan0, buffer, 0, buffer.Length);
+
+                int top = -1;
+                int bottom = -1;
+                for (int row = 0; row < height; row++)
+                {
+                    int rowOffset = row * stride;
+                    for (int col = 0; col < width; col++)
+                    {
+                        int pixelOffset = rowOffset + col * 4;
+                        // Format32bppArgb byte order is B, G, R, A - any
+                        // channel above near-zero means a white-on-black
+                        // ink pixel (including a faint anti-aliased edge).
+                        if (buffer[pixelOffset] > 10 || buffer[pixelOffset + 1] > 10 || buffer[pixelOffset + 2] > 10)
+                        {
+                            if (top < 0)
+                                top = row;
+                            bottom = row;
+                            break;
+                        }
+                    }
+                }
+
+                if (top >= 0 && bottom >= top)
+                {
+                    _textInkHeight = bottom - top + 1;
+                    _textInkCenterOffset = (top + bottom) / 2.0;
+                }
+                else
+                {
+                    // Fallback - should never happen for a font that can
+                    // render digits, but keeps layout sane instead of a
+                    // zero-size icon if it ever does.
+                    _textInkHeight = Math.Max(1, (int)Math.Round(_scaledFontSize));
+                    _textInkCenterOffset = _textInkHeight / 2.0;
+                }
+            }
+            finally
+            {
+                bmp.UnlockBits(data);
+            }
+        }
+
+        DebugLog.Write("RowIcons", $"MeasureTextInk: scaledFontSize={_scaledFontSize} textInkHeight={_textInkHeight} textInkCenterOffset={_textInkCenterOffset}");
     }
 
     // Cheap, unlogged size-only query - used for every row's name-column
     // reservation (see OnPaint), not just the one row per group that
     // actually draws the icon, so names stay aligned down the whole list
     // (see the name-column comment there). Same value ComputeRowIconLayout
-    // uses, just without recomputing/logging the Y position too.
+    // uses, just without recomputing the Y position too.
     private int ComputeRowIconSize()
     {
-        return Math.Max(1, (int)Math.Round(ComputeAscentPixels()));
+        return Math.Max(1, _textInkHeight);
     }
 
     private (int size, int y) ComputeRowIconLayout(int y)
     {
-        double ascentPixels = ComputeAscentPixels();
-        int size = Math.Max(1, (int)Math.Round(ascentPixels));
-        int textVisualCenter = (y - 1) + (int)Math.Round(ascentPixels / 2);
+        int size = ComputeRowIconSize();
+        // _textInkCenterOffset was measured relative to a DrawString call
+        // at y = 0 (see MeasureTextInk); row text itself draws at y - 1
+        // (see OnPaint), so the same offset applies from that anchor.
+        int textVisualCenter = (y - 1) + (int)Math.Round(_textInkCenterOffset);
         int iconY = textVisualCenter - size / 2;
-        DebugLog.Write("RowIcons", $"ComputeRowIconLayout: y={y} scaledFontSize={_scaledFontSize} ascentPixels={ascentPixels} size={size} sensorLineHeight={_sensorLineHeight} -> textVisualCenter={textVisualCenter} iconY={iconY}");
+        DebugLog.Write("RowIcons", $"ComputeRowIconLayout: y={y} textInkHeight={_textInkHeight} textInkCenterOffset={_textInkCenterOffset} size={size} -> textVisualCenter={textVisualCenter} iconY={iconY}");
         return (size, iconY);
     }
 
