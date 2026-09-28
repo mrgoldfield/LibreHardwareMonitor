@@ -56,7 +56,7 @@ internal static class StartupGuideDialog
         {
             AutoSize = true,
             MaximumSize = new Size(360, 0),
-            Text = "•  Right-click a sensor in the tree, then \"Show in Gadget\", to add it.\n" +
+            Text = "•  Right-click a sensor in the tree, then \"Add to Full Gadget\", to add it.\n" +
                    "•  Right-click a sensor in the gadget to reorder it, set a bar/name/text color, or arm alarm coloring.\n" +
                    "•  Double-click the gadget to switch between Mini and Full mode.\n" +
                    "•  Drag any edge of the gadget to resize it.\n" +

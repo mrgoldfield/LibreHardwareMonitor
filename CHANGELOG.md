@@ -361,8 +361,29 @@ upstream LibreHardwareMonitor this fork started from.
   it needs a specific right-clicked sensor and only ever appears in the
   per-sensor block. User-requested 2026-09-28. Built and tested locally
   (both targets, 61/61) - not yet visually reconfirmed.
+- **Right-click menu, second pass (submenus).** Following Gemini's menu
+  review: a sensor-row right-click showed ~25 top-level items, enough to
+  clip near the bottom of the screen. Now: Device/Sensor header - Move
+  Up/Down + Display Name... - a "Colors & Thresholds" submenu (Bar Color,
+  Text Color, Name Color, Gradient Colors...) + Value Display - Remove
+  from Gadget - then the gadget-wide section as Mini Mode, "Appearance"
+  (Font Size, Scale, Font Color, Background Color, Gradient Bar
+  Background), "Layout" (Hardware Names, Row Icons, Group Spacing...),
+  "Window" (Lock Position and Size, Always on Top, Opacity), Theme /
+  Profile, and finally "Hide/Show Main Window" as the very last item.
+  Hide/Show moved to the bottom (user choice 2026-09-28) because its
+  earlier "top of the gadget-wide section" spot still landed it mid-menu,
+  right under Remove, whenever a sensor row's block was prepended. "Remove
+  from Widget" renamed "Remove from Gadget" to match every other label.
+  Built and tested locally (both targets, 62/62) - not yet visually
+  confirmed.
 
 ### Fixed
+- **Removing a row in Mini mode also removed it from Full.** The gadget's
+  "Remove from Widget" always called `Remove()`, which clears both Full
+  and Mini membership. In Mini mode it now reads "Remove from Mini
+  Gadget" and only drops the sensor from Mini (`RemoveFromMini`), leaving
+  Full untouched. Found in Gemini's menu review, 2026-09-28.
 - Two dialogs (`GradientThresholdDialog`, `DisplayNameDialog`) had a
   fixed-height instruction label that could overflow onto the input
   field below it if the text wrapped to more lines than expected (e.g.
