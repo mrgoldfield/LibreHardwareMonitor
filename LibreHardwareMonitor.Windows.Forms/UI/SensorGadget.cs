@@ -238,6 +238,32 @@ public class SensorGadget : Gadget
     private readonly ToolStripMenuItem _opacityMenu = new ToolStripMenuItem("Opacity");
     private readonly ToolStripMenuItem _scaleMenu = new ToolStripMenuItem("Scale");
 
+    // Fork addition (Row Icons, user-requested 2026-09-28): a gadget-wide
+    // choice to prefix every sensor row's display name with its hardware-
+    // type icon (HardwareTypeImage - the same icon the hardware header row
+    // already shows once per group) followed by its sensor-category icon
+    // (SensorTypeImage - Load/Temperature/Fan/etc., the same set TypeNode
+    // uses in the main window's tree). "Icons Only" drops the text
+    // entirely instead of just prepending the icons, for users who'd
+    // rather recognize a row by icon than read its name. Off by default -
+    // a purely opt-in cosmetic change, like Mini Mode/gradient bar
+    // background before it.
+    private enum RowIconMode
+    {
+        Off,
+        WithName,
+        IconsOnly
+    }
+
+    private RowIconMode _rowIconMode;
+    private readonly ToolStripMenuItem _rowIconsMenu = new ToolStripMenuItem("Row Icons");
+
+    private static RowIconMode GetRowIconMode(PersistentSettings settings)
+    {
+        string raw = settings.GetValue("sensorGadget.RowIcons", nameof(RowIconMode.Off));
+        return Enum.TryParse(raw, out RowIconMode mode) ? mode : RowIconMode.Off;
+    }
+
     private Font _largeFont;
     private Font _smallFont;
     private Brush _textBrush;
@@ -460,6 +486,27 @@ public class SensorGadget : Gadget
             _scaleMenu.DropDownItems.Add(item);
         }
         contextMenuStrip.Items.Add(_scaleMenu);
+
+        _rowIconMode = GetRowIconMode(settings);
+        (RowIconMode value, string label)[] rowIconOptions =
+        {
+            (RowIconMode.Off, "Off"),
+            (RowIconMode.WithName, "Icons + Name"),
+            (RowIconMode.IconsOnly, "Icons Only")
+        };
+        foreach ((RowIconMode value, string label) in rowIconOptions)
+        {
+            ToolStripMenuItem item = new ToolStripMenuItem(label) { Checked = _rowIconMode == value, Tag = value };
+            item.Click += delegate
+            {
+                _rowIconMode = value;
+                settings.SetValue("sensorGadget.RowIcons", value.ToString());
+                SyncCheckedByTag(_rowIconsMenu, value);
+                Resize();
+            };
+            _rowIconsMenu.DropDownItems.Add(item);
+        }
+        contextMenuStrip.Items.Add(_rowIconsMenu);
 
         Color fontColor = settings.GetValue("sensorGadget.FontColor", Color.White);
         SetFontColor(fontColor);
@@ -1685,6 +1732,9 @@ public class SensorGadget : Gadget
         _hardwareNamesItem.Checked = HardwareNamesEnabled;
         _gradientBarBackground.Value = _settings.GetValue("sensorGadget.gradientBarBackground", false);
 
+        _rowIconMode = GetRowIconMode(_settings);
+        SyncCheckedByTag(_rowIconsMenu, _rowIconMode);
+
         Resize();
         Redraw();
     }
@@ -1790,7 +1840,13 @@ public class SensorGadget : Gadget
                     longestNameWidth = Math.Max(longestNameWidth, g.MeasureString(ResolveSensorDisplayName(_settings, sensor), _smallFont, int.MaxValue, StringFormat.GenericTypographic).Width);
             }
 
-            int nameSideWidth = _leftMargin + _iconSize + (int)Math.Ceiling(longestNameWidth) + 4;
+            // Fork addition (Row Icons): a sensor row prepends two icons
+            // (device + category) when enabled, on top of the one icon
+            // width already budgeted above for the hardware header row -
+            // add room for the second one so Row Icons doesn't immediately
+            // truncate every name it's placed in front of.
+            int rowIconsWidth = _rowIconMode == RowIconMode.Off ? 0 : _iconSize + 1;
+            int nameSideWidth = _leftMargin + _iconSize + rowIconsWidth + (int)Math.Ceiling(longestNameWidth) + 4;
             return Math.Max((int)Math.Round(17.3 * scaledFontSize), rightSideWidth + nameSideWidth);
         }
     }
@@ -2837,10 +2893,20 @@ public class SensorGadget : Gadget
                         remainingWidth = barX;
                     }
 
-                    remainingWidth -= _leftMargin + 2;
-                    if (remainingWidth > 0)
+                    int nameX = _leftMargin;
+                    if (_rowIconMode != RowIconMode.Off)
                     {
-                        g.DrawString(ResolveSensorDisplayName(_settings, sensor), _smallFont, GetColorBrush(ResolveSensorNameColor(sensor)), new RectangleF(_leftMargin - 1, y - 1, remainingWidth, 0), _trimStringFormat);
+                        int iconY = y + (_sensorLineHeight - _iconSize) / 2;
+                        g.DrawImage(HardwareTypeImage.Instance.GetImage(hardware.HardwareType), new Rectangle(nameX - 1, iconY, _iconSize, _iconSize));
+                        nameX += _iconSize + 1;
+                        g.DrawImage(SensorTypeImage.Instance.GetImage(sensor.SensorType), new Rectangle(nameX - 1, iconY, _iconSize, _iconSize));
+                        nameX += _iconSize + 1;
+                    }
+
+                    remainingWidth -= nameX - _leftMargin + 2;
+                    if (remainingWidth > 0 && _rowIconMode != RowIconMode.IconsOnly)
+                    {
+                        g.DrawString(ResolveSensorDisplayName(_settings, sensor), _smallFont, GetColorBrush(ResolveSensorNameColor(sensor)), new RectangleF(nameX - 1, y - 1, remainingWidth, 0), _trimStringFormat);
                     }
                     y += _sensorLineHeight + extraPerStep;
                 }

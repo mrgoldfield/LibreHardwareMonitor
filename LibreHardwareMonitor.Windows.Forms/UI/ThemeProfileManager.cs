@@ -41,7 +41,8 @@ internal static class ThemeProfileManager
         "sensorGadget.HardwarenamesFull",
         "sensorGadget.HardwarenamesMini",
         "sensorGadget.gradientBarBackground",
-        "sensorGadget.ScaleMultiplier"
+        "sensorGadget.ScaleMultiplier",
+        "sensorGadget.RowIcons"
     };
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
