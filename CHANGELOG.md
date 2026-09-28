@@ -193,6 +193,21 @@ upstream LibreHardwareMonitor this fork started from.
   one-time "what sensors go in the gadget" choice and can't be reopened).
   Built and tested locally (both targets, 61/61) - not yet visually
   reconfirmed.
+- **Made Mini/Full defaults actually distinguishable.** Every default
+  rule in `WidgetDefaultSelections.cs` that was in Mini was also in Full
+  (Mini-implies-Full), and the Full-only rules (CPU/GPU temperature,
+  GPU load/memory) all depend on hardware that isn't always present -
+  so on a machine with no discrete GPU and no reported CPU temperature
+  (e.g. some VMs), toggling Mini/Full showed identical content by
+  default. Moved "Used Space" (drive % used) from Mini to Full-only, and
+  added a broader board/Super I/O temperature rule (first available
+  Temperature sensor under `HardwareType.SuperIO`, no name filter -
+  board sensor names vary too much by vendor to name-match the way CPU
+  Package's short list does) as a fallback alongside the existing
+  CPU-specific one. Only affects a *fresh* `DefaultWidgetSelections.json`
+  - an existing one on disk isn't touched, since the file is meant to be
+  user-editable and is only ever regenerated if missing. Built and
+  tested locally (both targets, 61/61) - not yet visually reconfirmed.
 
 ### Fixed
 - Two dialogs (`GradientThresholdDialog`, `DisplayNameDialog`) had a

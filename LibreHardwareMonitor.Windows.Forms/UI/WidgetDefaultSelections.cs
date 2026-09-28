@@ -127,7 +127,13 @@ internal static class WidgetDefaultSelections
             },
             new WidgetDefaultRule
             {
-                Mode = "M",
+                // Fork change 2026-09-28: was Mode "M" (Mini) - moved to
+                // Full-only so Mini/Full defaults are actually
+                // distinguishable out of the box. Every other Mini rule
+                // above is also in Full already (Mini-implies-Full), so
+                // with this one also in Mini, toggling the gadget's
+                // Mini/Full mode showed identical content by default.
+                Mode = "F",
                 Comment = "Used capacity % of whichever physical disk hosts the Windows drive",
                 HardwareType = "Storage",
                 SensorType = "Load",
@@ -145,6 +151,26 @@ internal static class WidgetDefaultSelections
             new WidgetDefaultRule { Mode = "F", Comment = "GPU temperature, only added if this GPU brand is present", HardwareType = "GpuNvidia", SensorType = "Temperature" },
             new WidgetDefaultRule { Mode = "F", Comment = "GPU temperature, only added if this GPU brand is present", HardwareType = "GpuAmd", SensorType = "Temperature" },
             new WidgetDefaultRule { Mode = "F", Comment = "GPU temperature, only added if this GPU brand is present", HardwareType = "GpuIntel", SensorType = "Temperature" },
+            new WidgetDefaultRule
+            {
+                // Fork addition 2026-09-28: a broader complement to the
+                // CPU-specific temperature rule above. Board/Super I/O
+                // temperature sensor names vary too much by vendor to
+                // name-match reliably (unlike CPU Package's short, known
+                // list), so this takes the first Temperature sensor the
+                // Super I/O chip reports, whatever it's called - reported
+                // under HardwareType.SuperIO, not Motherboard (see
+                // SuperIOHardware.cs), even though "the motherboard's
+                // temperature" is how a user would describe it. Machines
+                // with no Super I/O chip exposing a temperature (laptops,
+                // some pre-builts, virtual machines) simply get nothing
+                // from this rule, same as any other rule that finds no
+                // match.
+                Mode = "F",
+                Comment = "First available board/Super I/O temperature sensor, whatever it's named",
+                HardwareType = "SuperIO",
+                SensorType = "Temperature"
+            },
             new WidgetDefaultRule
             {
                 Mode = "F",
