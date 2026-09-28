@@ -9,6 +9,12 @@ upstream LibreHardwareMonitor this fork started from.
 
 ## [Unreleased]
 
+## [0.9.7-gogogadget.6] - 2026-09-28 (alpha)
+
+First release build of the fork, published as a GitHub pre-release. Everything
+below has been built and unit-tested on Windows, but several of the most
+recent gadget features haven't yet been visually confirmed on real hardware.
+
 ### Added
 - Forked from LibreHardwareMonitor at commit `82bc3bd` (2026-09-13).
 - Project rebranded to GoGoGadget Hardware Monitor (see [CHANGES.md](CHANGES.md)).

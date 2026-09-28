@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <!-- Base off upstream's post-0.9.6 master (commit 82bc3bd, 2026-09-13). gogogadget.N bumps with each fork phase shipped - see CHANGELOG.md. -->
-    <Version>0.9.7-gogogadget.5</Version>
+    <Version>0.9.7-gogogadget.6</Version>
     <Copyright>LibreHardwareMonitor</Copyright>
   </PropertyGroup>
 </Project>
