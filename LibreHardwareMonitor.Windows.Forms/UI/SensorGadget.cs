@@ -743,12 +743,17 @@ public class SensorGadget : Gadget
             }
         };
 
-        // Fork addition (Value Display): "%"/"Bar"/"Both" per bar-capable
-        // sensor - see IsBarCapableSensorType and UpdateSensorMenuItems,
-        // which only inserts this item for those sensor types.
+        // Fork addition (Value Display): "%"/"Bar" per bar-capable sensor -
+        // see IsBarCapableSensorType and UpdateSensorMenuItems, which only
+        // inserts this item for those sensor types. "Both" (number layered
+        // on the bar) exists in the model/paint code below and is still
+        // wired up here, but deliberately left out of the menu - doesn't
+        // look good yet (2026-09-28) and GetValueDisplayMode clamps any
+        // already-persisted "Both" back to "%" so nobody's stuck seeing
+        // it. Re-add the DropDownItems.Add line below to bring it back
+        // once the look is fixed.
         _valueDisplayItem.DropDownItems.Add(_valueDisplayBarItem);
         _valueDisplayItem.DropDownItems.Add(_valueDisplayPercentItem);
-        _valueDisplayItem.DropDownItems.Add(_valueDisplayBothItem);
         _valueDisplayBarItem.Click += delegate
         {
             if (_contextMenuSensor == null)

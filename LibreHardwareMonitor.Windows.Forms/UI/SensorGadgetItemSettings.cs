@@ -212,11 +212,19 @@ internal static class SensorGadgetItemSettings
 
     // Fork addition (Value Display %/Bar/Both): default is "Percent" -
     // user preferred the plain number over "Both"'s number-on-bar look
-    // (2026-09-22).
+    // (2026-09-22). "Both" itself is disabled (2026-09-28, doesn't look
+    // good yet) - clamped to "Percent" here too, so a sensor that
+    // already had "Both" persisted from before it was disabled (or the
+    // setting file was hand-edited) doesn't keep showing it just
+    // because the menu item to pick it is gone. Not removed from the
+    // enum/paint code, just never returned.
     public static ValueDisplayMode GetValueDisplayMode(PersistentSettings settings, ISensor sensor)
     {
         string raw = settings.GetValue(Key(sensor, ValueDisplaySuffix), nameof(ValueDisplayMode.Percent));
-        return Enum.TryParse(raw, out ValueDisplayMode mode) ? mode : ValueDisplayMode.Percent;
+        if (!Enum.TryParse(raw, out ValueDisplayMode mode) || mode == ValueDisplayMode.Both)
+            return ValueDisplayMode.Percent;
+
+        return mode;
     }
 
     public static void SetValueDisplayMode(PersistentSettings settings, ISensor sensor, ValueDisplayMode mode)
