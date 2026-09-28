@@ -1912,9 +1912,11 @@ public class SensorGadget : Gadget
             }
 
             // Fork addition (Row Icons): only the first sensor row of each
-            // group gets a device icon, same as the hardware header row
-            // already does - the single _iconSize allowance below already
-            // covers that, no extra needed.
+            // group gets a device icon, sized from the font's ascent (see
+            // ComputeRowIconSize) - always smaller than _iconSize (the
+            // header row's icon, sized for its taller _hardwareLineHeight)
+            // - so the single _iconSize allowance below already covers it
+            // too, no extra needed.
             int nameSideWidth = _leftMargin + _iconSize + (int)Math.Ceiling(longestNameWidth) + 4;
             return Math.Max((int)Math.Round(17.3 * scaledFontSize), rightSideWidth + nameSideWidth);
         }
@@ -2573,33 +2575,57 @@ public class SensorGadget : Gadget
         Size = new Size(width, y);
     }
 
-    // Fork addition (Row Icons): where to vertically place the device
-    // icon so it lines up with the row's actual text ink, not just the
-    // font's full line-height box. Two earlier attempts (centering
-    // against _sensorLineHeight + extraPerStep, then against
-    // _sensorLineHeight alone) both centered the icon within the full
-    // line box GDI+ reserves for DrawString - which includes descent
-    // space below the baseline for characters like g/y/p that a sensor's
-    // numeric value or name never uses, plus internal leading above the
-    // ascent - and the user reported the icon still sitting visibly
-    // above the text's actual ink both times. This instead centers
-    // against the font's ascent alone (FontFamily.GetCellAscent), which
-    // approximates the visible cap-height band digits/letters without
-    // descenders actually occupy - much closer to where the eye reads
-    // the text as being. Logged every time (DebugLog "RowIcons") so a
-    // next round, if this still isn't quite right, has real numbers to
-    // work from instead of another guess.
-    private int ComputeRowIconY(int y)
+    // Fork addition (Row Icons): the device icon's own size and vertical
+    // position for a sensor row, computed together since they depend on
+    // the same font metric. Three earlier attempts at just the Y
+    // position (centering _iconSize - the header row's icon size,
+    // 1.5x scaledFontSize - against _sensorLineHeight + extraPerStep,
+    // then against _sensorLineHeight alone, then against the font's
+    // ascent alone) all still looked wrong per user feedback, and the
+    // DebugLog output from the third attempt showed why: _iconSize
+    // (~1.5x scaledFontSize) is nearly as tall as _sensorLineHeight
+    // itself (~1.55x) - there's only ~3% of the row left as slack, nowhere
+    // near enough room to visually offset a same-sized icon to align with
+    // the font's much shorter ascent band (~1.08x scaledFontSize) without
+    // it clipping above the row (confirmed: iconY came out negative for
+    // the very first row). _iconSize was always sized for the *header*
+    // row (_hardwareLineHeight, ~1.9x scaledFontSize, plenty of slack for
+    // a 1.5x icon) - reusing it for the much tighter sensor row was the
+    // actual root cause, not the choice of vertical anchor. This instead
+    // sizes the row icon from the ascent itself (FontFamily.GetCellAscent),
+    // so it fits the row with room to actually center, and centers it on
+    // that same ascent band (approximating the visible cap-height digits/
+    // letters without descenders occupy, not the font's full line-height
+    // box which reserves unused descent space below the baseline).
+    // Logged every time (DebugLog "RowIcons") so a further round, if
+    // needed, has real numbers instead of another guess.
+    private double ComputeAscentPixels()
     {
         FontFamily family = _smallFont.FontFamily;
         FontStyle style = _smallFont.Style;
         int designAscent = family.GetCellAscent(style);
         int designEmHeight = family.GetEmHeight(style);
-        double ascentPixels = _scaledFontSize * designAscent / designEmHeight;
+        return _scaledFontSize * designAscent / designEmHeight;
+    }
+
+    // Cheap, unlogged size-only query - used for every row's name-column
+    // reservation (see OnPaint), not just the one row per group that
+    // actually draws the icon, so names stay aligned down the whole list
+    // (see the name-column comment there). Same value ComputeRowIconLayout
+    // uses, just without recomputing/logging the Y position too.
+    private int ComputeRowIconSize()
+    {
+        return Math.Max(1, (int)Math.Round(ComputeAscentPixels()));
+    }
+
+    private (int size, int y) ComputeRowIconLayout(int y)
+    {
+        double ascentPixels = ComputeAscentPixels();
+        int size = Math.Max(1, (int)Math.Round(ascentPixels));
         int textVisualCenter = (y - 1) + (int)Math.Round(ascentPixels / 2);
-        int iconY = textVisualCenter - _iconSize / 2;
-        DebugLog.Write("RowIcons", $"ComputeRowIconY: y={y} scaledFontSize={_scaledFontSize} designAscent={designAscent} designEmHeight={designEmHeight} ascentPixels={ascentPixels} iconSize={_iconSize} sensorLineHeight={_sensorLineHeight} -> textVisualCenter={textVisualCenter} iconY={iconY}");
-        return iconY;
+        int iconY = textVisualCenter - size / 2;
+        DebugLog.Write("RowIcons", $"ComputeRowIconLayout: y={y} scaledFontSize={_scaledFontSize} ascentPixels={ascentPixels} size={size} sensorLineHeight={_sensorLineHeight} -> textVisualCenter={textVisualCenter} iconY={iconY}");
+        return (size, iconY);
     }
 
     private void DrawImageWidthBorder(Graphics g, int width, int height, Image back, int t, int b, int l, int r)
@@ -3028,12 +3054,17 @@ public class SensorGadget : Gadget
                     // particular row has an icon.
                     if (_rowIconMode != RowIconMode.Off)
                     {
+                        int rowIconSize;
                         if (isFirstSensorInGroup)
                         {
-                            int iconY = ComputeRowIconY(y);
-                            g.DrawImage(HardwareTypeImage.Instance.GetImage(hardware.HardwareType), new Rectangle(nameX - 1, iconY, _iconSize, _iconSize));
+                            (rowIconSize, int iconY) = ComputeRowIconLayout(y);
+                            g.DrawImage(HardwareTypeImage.Instance.GetImage(hardware.HardwareType), new Rectangle(nameX - 1, iconY, rowIconSize, rowIconSize));
                         }
-                        nameX += _iconSize + 1;
+                        else
+                        {
+                            rowIconSize = ComputeRowIconSize();
+                        }
+                        nameX += rowIconSize + 1;
                     }
 
                     // Icons Only: the device icon replaces the name on the

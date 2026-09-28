@@ -298,19 +298,23 @@ upstream LibreHardwareMonitor this fork started from.
   name column is indented by the same icon-width gap whether or not that
   particular row draws an icon, so names stay aligned down the whole list
   instead of only the icon row's name being pushed over. The icon's
-  vertical position went through three attempts the same day before
-  landing on `ComputeRowIconY`: centering against the full row+spacing
-  slot, then against `_sensorLineHeight` alone, both of which center the
-  icon within the *entire* line-height box `DrawString` reserves -
-  including descent space below the baseline for characters like g/y/p
-  that a sensor's number/name never actually uses, which visibly pulled
-  the icon above the text's real ink both times per user feedback.
-  `ComputeRowIconY` instead centers against the font's ascent alone
-  (`FontFamily.GetCellAscent`), approximating just the visible cap-height
-  band digits/letters without descenders actually occupy - much closer to
-  where the text reads as being. Logged every draw (`DebugLog` tag
-  "RowIcons") so a further round, if needed, has real numbers to work
-  from instead of another guess. Built and tested locally (both targets,
+  size/position went through four attempts the same day, the last three
+  still visibly wrong per user screenshots: centering the header row's
+  icon size (`_iconSize`, 1.5x font size - sized for the taller
+  `_hardwareLineHeight`) against the full row+spacing slot, then against
+  `_sensorLineHeight` alone, then against just the font's ascent
+  (`FontFamily.GetCellAscent`) - all three still centered a fixed
+  `_iconSize`-sized icon, and `_iconSize` (~1.5x scaledFontSize) turned
+  out to be nearly as tall as `_sensorLineHeight` itself (~1.55x) -
+  diagnostic logging (`DebugLog` tag "RowIcons", added on the third
+  attempt) confirmed this directly: the computed Y went negative for the
+  first row, meaning the icon had nowhere to fit without clipping no
+  matter which point it centered on. The actual fix: a dedicated,
+  smaller row-icon size derived from the ascent itself
+  (`ComputeRowIconSize`/`ComputeRowIconLayout`) instead of reusing
+  `_iconSize` (which stays used for the header row, unaffected) - sized
+  and centered on the same ascent band, so it actually fits the tighter
+  sensor row with room to center. Built and tested locally (both targets,
   62/62) - not yet visually reconfirmed.
 - **Group Spacing.** Gadget right-click menu -> "Group Spacing..." opens a
   small dialog to set an optional extra gap, in raw pixels, drawn between
