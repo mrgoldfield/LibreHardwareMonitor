@@ -2907,11 +2907,32 @@ public class SensorGadget : Gadget
                     // it automatically follows whichever sensor Move Up/
                     // Move Down has sorted to the top of list via
                     // gadget.order - no separate tracking needed.
-                    bool showIcon = _rowIconMode != RowIconMode.Off && isFirstSensorInGroup;
-                    if (showIcon)
+                    //
+                    // The name column's X shift below is unconditional
+                    // (applied whenever Row Icons is on at all, not just on
+                    // the row that actually draws one) - user-reported: a
+                    // shift only on the icon row left every other row's
+                    // name flush left instead, misaligning the whole
+                    // column. Reserving the same icon-width gap on every
+                    // row keeps names lined up whether or not that
+                    // particular row has an icon.
+                    if (_rowIconMode != RowIconMode.Off)
                     {
-                        int iconY = y + (_sensorLineHeight - _iconSize) / 2;
-                        g.DrawImage(HardwareTypeImage.Instance.GetImage(hardware.HardwareType), new Rectangle(nameX - 1, iconY, _iconSize, _iconSize));
+                        if (isFirstSensorInGroup)
+                        {
+                            // Fork fix: centered against the row's actual
+                            // rendered height (_sensorLineHeight +
+                            // extraPerStep), not just the nominal
+                            // _sensorLineHeight - a user who's dragged the
+                            // gadget taller (extraPerStep > 0, see
+                            // _lineSpacingManuallySet) adds that extra space
+                            // below y on every row, so centering against
+                            // _sensorLineHeight alone would leave the icon
+                            // sitting above center instead of in the middle
+                            // of the wider gap the user actually dragged in.
+                            int iconY = y + (_sensorLineHeight + extraPerStep - _iconSize) / 2;
+                            g.DrawImage(HardwareTypeImage.Instance.GetImage(hardware.HardwareType), new Rectangle(nameX - 1, iconY, _iconSize, _iconSize));
+                        }
                         nameX += _iconSize + 1;
                     }
 
