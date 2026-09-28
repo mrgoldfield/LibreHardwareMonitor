@@ -96,7 +96,12 @@ public sealed partial class MainForm : Form
             Height = _settings.GetValue("mainForm.Height", 640)
         };
 
-        Theme setTheme = Theme.All.FirstOrDefault(theme => _settings.GetValue("theme", "auto") == theme.Id);
+        // Fork change: default was "auto" (follow the OS light/dark
+        // setting) - now defaults to "dark" outright. Both this and the
+        // matching default in InitializeTheme (menu-checked sync) must
+        // agree, or a fresh install would run dark but show "Auto"
+        // unchecked in the Theme menu.
+        Theme setTheme = Theme.All.FirstOrDefault(theme => _settings.GetValue("theme", "dark") == theme.Id);
         if (setTheme != null)
         {
             Theme.Current = setTheme;
@@ -285,7 +290,14 @@ public sealed partial class MainForm : Form
         _readBatterySensors = new UserOption("batteryMenuItem", true, batteryMenuItem, _settings);
         _readBatterySensors.Changed += delegate { _computer.IsBatteryEnabled = _readBatterySensors.Value; };
 
-        _showGadget = new UserOption("gadgetMenuItem", false, gadgetMenuItem, _settings);
+        // Fork change: default was false (gadget hidden until the user
+        // opted in). UserOption.Changed's add-accessor invokes the
+        // handler immediately on subscription (see UserOption.cs), so
+        // this true default correctly cascades into showing the gadget
+        // and triggering FirstActivationDialog below on a fresh install,
+        // the same as if the user had just checked "Show Gadget"
+        // themselves.
+        _showGadget = new UserOption("gadgetMenuItem", true, gadgetMenuItem, _settings);
 
         _forceDriveWakeup = new UserOption("forceDriveWakeupItem", false, forceDriveWakeupItem, _settings);
         _forceDriveWakeup.Changed += delegate
@@ -576,6 +588,19 @@ public sealed partial class MainForm : Form
             _settings.SetValue("mainForm.showStartupGuide", showOnStartup);
         }
 
+        // Fork addition: the gadget is made visible early above (via
+        // _showGadget.Changed, which UserOption fires immediately on
+        // subscription), naturally front-most at that instant since
+        // nothing else from this app is on screen yet - but Show() and
+        // the modal dialogs above each become the active window in turn
+        // afterward and can end up stacked in front of it by the time
+        // startup actually finishes. One-time, non-sticky nudge back to
+        // the front now that all of that has settled - see
+        // GadgetWindow.BringToFront for why this isn't the same as
+        // AlwaysOnTop.
+        if (_gadget != null && _showGadget.Value)
+            _gadget.BringToFront();
+
         // Create a handle, otherwise calling Close() does not fire FormClosed
 
         // Make sure the settings are saved when the user logs off
@@ -634,7 +659,7 @@ public sealed partial class MainForm : Form
         ThemedVScrollIndicator.AddToControl(treeView);
         ThemedHScrollIndicator.AddToControl(treeView);
 
-        string themeSetting = _settings.GetValue("theme", "auto");
+        string themeSetting = _settings.GetValue("theme", "dark");
         bool themeSelected = false;
 
         void ClearThemeMenu()

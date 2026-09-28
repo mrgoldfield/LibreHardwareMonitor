@@ -208,6 +208,46 @@ upstream LibreHardwareMonitor this fork started from.
   - an existing one on disk isn't touched, since the file is meant to be
   user-editable and is only ever regenerated if missing. Built and
   tested locally (both targets, 61/61) - not yet visually reconfirmed.
+- **Fresh-install defaults changed: dark theme, gadget shown, hardware
+  names split by mode.**
+  - Main window theme now defaults to `"dark"` instead of `"auto"`
+    (follow the OS's light/dark setting) - both the startup theme-apply
+    and the Theme menu's checked-state sync had to move to this new
+    default together, or a fresh install would run dark but show
+    nothing checked in the Theme menu.
+  - `_showGadget` now defaults to `true` (was `false`, hidden until the
+    user opted in) - `UserOption.Changed`'s add-accessor invokes its
+    handler immediately on subscription, so this correctly cascades
+    into showing the gadget and triggering `FirstActivationDialog` on a
+    fresh install, same as if the user had just checked "Show Gadget"
+    themselves.
+  - "Hardware Names" split from one `sensorGadget.Hardwarenames` setting
+    shared by both modes into two independent ones,
+    `sensorGadget.HardwarenamesFull` (defaults on) and
+    `sensorGadget.HardwarenamesMini` (defaults off) - the single shared
+    setting was one more way Mini and Full looked identical by default
+    (see the Mini/Full defaults entry above for the sensor-selection
+    half of the same problem). The "Hardware Names" checkbox is now
+    manually resynced to whichever setting is currently active (on mode
+    toggle and Theme/Profile import) instead of a `UserOption` owning it,
+    since `UserOption` is wired to one fixed settings key for its whole
+    lifetime. `ThemeProfileManager.ThemeKeys` updated to export both new
+    keys in place of the old one.
+  - **Gadget could end up hidden behind the main window/startup dialogs
+    on a fresh install.** Making the gadget visible early in `MainForm`'s
+    constructor puts it naturally front-most at that instant (nothing
+    else from this app is on screen yet), but `Show()` and the modal
+    `FirstActivationDialog`/`StartupGuideDialog` that follow it each
+    become the active window in turn and can end up stacked in front of
+    it by the time startup actually finishes - not something the
+    previous default (`_showGadget` off) ever exposed, since the gadget
+    was never shown at startup at all. Added `GadgetWindow.BringToFront`
+    (exposed via `Gadget`) - a one-time, non-sticky `SetWindowPos(...,
+    HWND_TOP, ...)` nudge, distinct from `AlwaysOnTop`'s `HWND_TOPMOST` -
+    called last in `MainForm`'s constructor, after everything else above
+    has already run.
+  - Built and tested locally (both targets, 61/61) - not yet visually
+    reconfirmed.
 
 ### Fixed
 - Two dialogs (`GradientThresholdDialog`, `DisplayNameDialog`) had a

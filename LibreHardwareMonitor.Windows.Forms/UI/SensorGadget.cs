@@ -103,7 +103,34 @@ public class SensorGadget : Gadget
     private readonly List<IHardware> _hardwareOrder = new List<IHardware>();
     private static readonly HardwareComparer DefaultHardwareComparer = new HardwareComparer();
     private readonly PersistentSettings _settings;
-    private readonly UserOption _hardwareNames;
+
+    // Fork change (2026-09-28): was a single UserOption/setting shared by
+    // both modes. Split into two independently-persisted settings
+    // (HardwareNamesEnabled resolves which one based on _miniMode) so
+    // Mini and Full can default differently - Full showing hardware
+    // names on and Mini off is one of the few things that made toggling
+    // Mini/Full look identical by default (see the "Made Mini/Full
+    // defaults actually distinguishable" CHANGELOG entry for the
+    // sensor-selection half of that same problem). _hardwareNamesItem is
+    // the single checkbox both settings share; its Checked state is
+    // manually resynced to whichever one is currently active (here and
+    // in _miniMode.Changed/ApplyThemeFromSettings) instead of a
+    // UserOption owning it, since UserOption is wired to exactly one
+    // fixed settings key for its whole lifetime.
+    private readonly ToolStripMenuItem _hardwareNamesItem = new ToolStripMenuItem("Hardware Names");
+
+    // Full defaults to true (was the fork's only prior behavior - a
+    // single always-on-by-default UserOption), Mini defaults to false.
+    // Written on _hardwareNamesItem's own click, and re-read (with the
+    // checkbox resynced) whenever mode changes or a Theme/Profile
+    // imports - see the field comment above and _miniMode.Changed/
+    // ApplyThemeFromSettings.
+    private bool HardwareNamesEnabled
+    {
+        get => _settings.GetValue(_miniMode.Value ? "sensorGadget.HardwarenamesMini" : "sensorGadget.HardwarenamesFull", !_miniMode.Value);
+        set => _settings.SetValue(_miniMode.Value ? "sensorGadget.HardwarenamesMini" : "sensorGadget.HardwarenamesFull", value);
+    }
+
     private UserOption _gradientBarBackground;
 
     // Fork addition: Mini shows only sensors explicitly added to it
@@ -369,8 +396,7 @@ public class SensorGadget : Gadget
         };
 
         ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
-        ToolStripMenuItem hardwareNamesItem = new ToolStripMenuItem("Hardware Names");
-        contextMenuStrip.Items.Add(hardwareNamesItem);
+        contextMenuStrip.Items.Add(_hardwareNamesItem);
         for (int i = 0; i < 5; i++)
         {
             float size;
@@ -827,24 +853,35 @@ public class SensorGadget : Gadget
             UpdateSensorMenuItems();
         };
 
-        _hardwareNames = new UserOption("sensorGadget.Hardwarenames", true, hardwareNamesItem, settings);
-        _hardwareNames.Changed += delegate
-        {
-            Resize();
-        };
-
         _gradientBarBackground = new UserOption("sensorGadget.gradientBarBackground", false, gradientBarBackgroundItem, settings);
         _gradientBarBackground.Changed += delegate
         {
             Redraw();
         };
 
+        // Fork change: _miniMode must exist before HardwareNamesEnabled
+        // is ever read/written (its resolver depends on _miniMode.Value)
+        // - constructed here, above the Hardware Names wiring below,
+        // instead of its original position further down.
         _miniMode = new UserOption("sensorGadget.miniMode", false, miniModeItem, settings);
         _miniMode.Changed += delegate
         {
             DebugLog.Write("MiniFull", $"miniMode.Changed -> {_miniMode.Value}");
+            // Fork addition: HardwareNamesEnabled resolves to a different
+            // setting per mode - resync the shared checkbox to whichever
+            // one is now active, since toggling mode alone (without ever
+            // clicking "Hardware Names" itself) can change its effective
+            // value.
+            _hardwareNamesItem.Checked = HardwareNamesEnabled;
             Resize();
             Redraw();
+        };
+
+        _hardwareNamesItem.Checked = HardwareNamesEnabled;
+        _hardwareNamesItem.Click += delegate
+        {
+            HardwareNamesEnabled = !HardwareNamesEnabled;
+            Resize();
         };
 
         // Fork addition: double-click anywhere on the gadget flips Mini/
@@ -1615,7 +1652,11 @@ public class SensorGadget : Gadget
         Opacity = (byte)_settings.GetValue("sensorGadget.Opacity", 255);
         SyncCheckedByTag(_opacityMenu, Opacity);
 
-        _hardwareNames.Value = _settings.GetValue("sensorGadget.Hardwarenames", true);
+        // HardwareNamesEnabled reads straight from _settings every call
+        // (no cached value to push into, unlike a UserOption) - a Theme
+        // import already updated the underlying key via _settings.SetValue
+        // before this runs, so only the checkbox display needs resyncing.
+        _hardwareNamesItem.Checked = HardwareNamesEnabled;
         _gradientBarBackground.Value = _settings.GetValue("sensorGadget.gradientBarBackground", false);
 
         Resize();
@@ -1716,7 +1757,7 @@ public class SensorGadget : Gadget
                 if (list.Count == 0)
                     continue;
 
-                if (_hardwareNames.Value)
+                if (HardwareNamesEnabled)
                     longestNameWidth = Math.Max(longestNameWidth, g.MeasureString(hardware.Name, _largeFont, int.MaxValue, StringFormat.GenericTypographic).Width);
 
                 foreach (ISensor sensor in list)
@@ -2321,7 +2362,7 @@ public class SensorGadget : Gadget
             if (list.Count == 0)
                 continue;
 
-            if (_hardwareNames.Value)
+            if (HardwareNamesEnabled)
             {
                 if (y > _topMargin)
                 {
@@ -2634,7 +2675,7 @@ public class SensorGadget : Gadget
                 if (list.Count == 0)
                     continue;
 
-                if (_hardwareNames.Value)
+                if (HardwareNamesEnabled)
                 {
                     if (y > _topMargin)
                         y += _hardwareLineHeight - _sensorLineHeight + extraPerStep;

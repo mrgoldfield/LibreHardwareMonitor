@@ -206,5 +206,11 @@ public abstract class Gadget : IDisposable
         _window.Redraw();
     }
 
+    // Fork addition: see GadgetWindow.BringToFront.
+    public void BringToFront()
+    {
+        _window.BringToFront();
+    }
+
     protected abstract void OnPaint(PaintEventArgs e);
 }

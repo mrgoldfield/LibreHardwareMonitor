@@ -120,6 +120,23 @@ public sealed class GadgetWindow : NativeWindow, IDisposable
         NativeMethods.SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
     }
 
+    // Fork addition: a one-time "surface above whatever's currently in
+    // front" nudge, distinct from AlwaysOnTop/MoveToTopMost above -
+    // HWND_TOP (not HWND_TOPMOST) puts the window at the front of the
+    // normal (non-topmost) Z-order band for just this call, it doesn't
+    // stick there the way AlwaysOnTop does. Needed because the gadget is
+    // made visible early in MainForm's constructor (naturally front-most
+    // at that instant, nothing else from this app is on screen yet), but
+    // MainForm.Show() and the modal FirstActivationDialog/StartupGuideDialog
+    // that follow it can each become the active window afterward and end
+    // up stacked in front of it - see MainForm's constructor, which calls
+    // this last, after all of those have already run.
+    public void BringToFront()
+    {
+        DebugLog.Write("ZOrder", "BringToFront");
+        NativeMethods.SetWindowPos(Handle, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
+    }
+
     private CreateParams CreateParams
     {
         get
@@ -644,6 +661,7 @@ public sealed class GadgetWindow : NativeWindow, IDisposable
         public int Colors;
     }
 
+    public static readonly IntPtr HWND_TOP = (IntPtr)0;
     public static readonly IntPtr HWND_BOTTOM = (IntPtr)1;
     public static readonly IntPtr HWND_TOPMOST = (IntPtr)(-1);
 

@@ -38,7 +38,8 @@ internal static class ThemeProfileManager
         "sensorGadget.FontColor",
         "sensorGadget.BackgroundColor",
         "sensorGadget.Opacity",
-        "sensorGadget.Hardwarenames",
+        "sensorGadget.HardwarenamesFull",
+        "sensorGadget.HardwarenamesMini",
         "sensorGadget.gradientBarBackground",
         "sensorGadget.ScaleMultiplier"
     };
