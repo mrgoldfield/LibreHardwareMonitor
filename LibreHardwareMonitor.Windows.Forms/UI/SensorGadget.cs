@@ -2458,6 +2458,61 @@ public class SensorGadget : Gadget
         g.DrawImage(back, new Rectangle(width - r, height - b, r, b), new Rectangle(back.Width - r, back.Height - b, r, b), u);
     }
 
+    // Fork addition: like DrawImageWidthBorder, but for the background
+    // layer specifically, replacing its large stretched middle-fill draw
+    // with a freshly-computed LinearGradientBrush instead of stretching a
+    // fixed ~117px source region to fill an arbitrary window height. The
+    // skin's built-in "glass panel" shading (a subtle lighter-top/
+    // darker-bottom two-tone gradient baked into gadget.png, which
+    // CreateBackgroundTint's hue-only re-tint carries through unchanged)
+    // looks fine stretched a little, but turns into an ugly hard-edged
+    // band once the fork's vertical drag-to-resize lets a user make the
+    // gadget far taller than the skin's native ~130px - something
+    // upstream's skin was never designed to accommodate. A brush-drawn
+    // gradient has no source "resolution" to run out of, so it stays
+    // smooth at any height. Its two endpoint colors are sampled from the
+    // actual current background image (so a custom Background Color tint
+    // still comes through) rather than hardcoded. Only used for the
+    // background (_backTinted ?? _back); the _fore overlay still uses
+    // DrawImageWidthBorder unchanged since it isn't the source of the
+    // banding.
+    private void DrawBackgroundImage(Graphics g, int width, int height, Image back, int t, int b, int l, int r)
+    {
+        GraphicsUnit u = GraphicsUnit.Pixel;
+
+        g.DrawImage(back, new Rectangle(0, 0, l, t), new Rectangle(0, 0, l, t), u);
+        g.DrawImage(back, new Rectangle(l, 0, width - l - r, t), new Rectangle(l, 0, back.Width - l - r, t), u);
+        g.DrawImage(back, new Rectangle(width - r, 0, r, t), new Rectangle(back.Width - r, 0, r, t), u);
+
+        g.DrawImage(back, new Rectangle(0, t, l, height - t - b), new Rectangle(0, t, l, back.Height - t - b), u);
+
+        Rectangle middleDest = new Rectangle(l, t, width - l - r, height - t - b);
+        if (middleDest.Width > 0 && middleDest.Height > 0)
+        {
+            using (Bitmap sourceBitmap = new Bitmap(back))
+            {
+                int sampleX = Math.Min(sourceBitmap.Width - 1, sourceBitmap.Width / 2);
+                int topY = Math.Min(sourceBitmap.Height - 1, t);
+                int bottomY = Math.Max(0, sourceBitmap.Height - b - 1);
+                Color topColor = sourceBitmap.GetPixel(sampleX, topY);
+                Color bottomColor = sourceBitmap.GetPixel(sampleX, bottomY);
+
+                using (LinearGradientBrush brush = new LinearGradientBrush(
+                           new Rectangle(middleDest.X, middleDest.Y, middleDest.Width, Math.Max(1, middleDest.Height)),
+                           topColor, bottomColor, LinearGradientMode.Vertical))
+                {
+                    g.FillRectangle(brush, middleDest);
+                }
+            }
+        }
+
+        g.DrawImage(back, new Rectangle(width - r, t, r, height - t - b), new Rectangle(back.Width - r, t, r, back.Height - t - b), u);
+
+        g.DrawImage(back, new Rectangle(0, height - b, l, b), new Rectangle(0, back.Height - b, l, b), u);
+        g.DrawImage(back, new Rectangle(l, height - b, width - l - r, b), new Rectangle(l, back.Height - b, back.Width - l - r, b), u);
+        g.DrawImage(back, new Rectangle(width - r, height - b, r, b), new Rectangle(back.Width - r, back.Height - b, r, b), u);
+    }
+
     private void DrawBackground(Graphics g)
     {
         int w = Size.Width;
@@ -2473,7 +2528,7 @@ public class SensorGadget : Gadget
 
             using (Graphics graphics = Graphics.FromImage(_background))
             {
-                DrawImageWidthBorder(graphics, w, h, _backTinted ?? _back, TopBorder, BottomBorder, LeftBorder, RightBorder);
+                DrawBackgroundImage(graphics, w, h, _backTinted ?? _back, TopBorder, BottomBorder, LeftBorder, RightBorder);
 
                 if (_fore != null)
                     DrawImageWidthBorder(graphics, w, h, _fore, TopBorder, BottomBorder, LeftBorder, RightBorder);

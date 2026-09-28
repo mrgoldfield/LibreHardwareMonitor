@@ -260,6 +260,23 @@ upstream LibreHardwareMonitor this fork started from.
   before clicking further into Bar/Text/Name Color, Gradient, Value
   Display, etc. Built and tested locally (both targets, 61/61) - not yet
   visually reconfirmed.
+- **Dynamic gradient background instead of a stretched skin image.** The
+  gadget's background skin (`Resources/gadget.png`) has a subtle baked-in
+  lighter-top/darker-bottom "glass panel" shade in its 9-slice-stretchable
+  middle region. Stretched only a little it looks fine, but once the
+  gadget is resized far taller than the skin's native ~130px (via the
+  fork's vertical drag-to-resize) the fixed-resolution source region gets
+  stretched into a visible hard-edged band instead of a smooth fade -
+  reported 2026-09-28 as visible banding in Mini mode. `SensorGadget`'s
+  background draw (`DrawBackgroundImage`, a background-only sibling of
+  the shared `DrawImageWidthBorder` used for the `_fore` overlay) now
+  fills the middle region with a `LinearGradientBrush` instead of a
+  stretched image; its two endpoint colors are sampled from the actual
+  current background image (`_backTinted ?? _back`), so a custom
+  Background Color/tint still comes through, and the gradient stays
+  mathematically smooth at any window height instead of running out of
+  source pixels. Built and tested locally (both targets, 61/61) - not yet
+  visually reconfirmed.
 
 ### Fixed
 - Two dialogs (`GradientThresholdDialog`, `DisplayNameDialog`) had a
