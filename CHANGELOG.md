@@ -9,6 +9,21 @@ upstream LibreHardwareMonitor this fork started from.
 
 ## [Unreleased]
 
+### Added
+- **Group Layout: Vertical / Horizontal.** Gadget right-click menu →
+  Layout → Group Layout. Vertical is the original look, with hardware
+  groups stacked top to bottom. Horizontal puts the groups side by side as
+  columns, left to right in group order, while each group's sensors still
+  stack vertically. Each column is auto-fit to its own names. A dragged
+  width is split evenly across the columns, and a dragged height (row
+  spacing) applies to every column; the gadget is as tall as its tallest
+  column. Group Spacing adds its extra pixels between columns in
+  Horizontal mode. In Horizontal mode a group header's right-click menu
+  says "Move Left"/"Move Right" instead of Up/Down. Switching orientation
+  resets a manually dragged width back to auto-fit. Gadget-wide
+  (`sensorGadget.GroupLayout`), shared by Mini and Full, and included in
+  exported Themes. User-requested 2026-09-28.
+
 ## [0.9.7-gogogadget.6] - 2026-09-28 (alpha)
 
 First release build of the fork, published as a GitHub pre-release. Everything

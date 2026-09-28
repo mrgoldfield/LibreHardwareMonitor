@@ -155,13 +155,16 @@ public class SensorGadget : Gadget
     // sensor row from the most recent paint, used to figure out which
     // sensor a right-click landed on so the context menu can offer
     // Move Up/Move Down for it. Rebuilt every OnPaint.
-    private readonly List<(ISensor Sensor, int Top, int Bottom)> _rowBounds = new List<(ISensor, int, int)>();
+    // Left/Right were added with Group Layout's Horizontal mode, where
+    // groups sit side by side and Y alone no longer identifies a row;
+    // in Vertical mode every row simply spans the full width.
+    private readonly List<(ISensor Sensor, int Left, int Top, int Right, int Bottom)> _rowBounds = new List<(ISensor, int, int, int, int)>();
 
     // Fork addition (hardware-group reordering): same idea as
     // _rowBounds, but for the hardware-name header rows, so a right-click
     // on "CPU" / "GPU" / etc. can offer Move Group Up/Down instead of the
     // per-sensor items.
-    private readonly List<(IHardware Hardware, int Top, int Bottom)> _hardwareHeaderBounds = new List<(IHardware, int, int)>();
+    private readonly List<(IHardware Hardware, int Left, int Top, int Right, int Bottom)> _hardwareHeaderBounds = new List<(IHardware, int, int, int, int)>();
     private readonly ToolStripMenuItem _moveUpItem = new ToolStripMenuItem("Move Up");
     private readonly ToolStripMenuItem _moveDownItem = new ToolStripMenuItem("Move Down");
     private readonly ToolStripMenuItem _moveGroupUpItem = new ToolStripMenuItem("Move Group Up");
@@ -309,6 +312,31 @@ public class SensorGadget : Gadget
     // sized/scaled gadget.
     private int _groupSpacingExtra;
     private readonly ToolStripMenuItem _groupSpacingItem = new ToolStripMenuItem("Group Spacing...");
+
+    // Fork addition (Group Layout, user-requested 2026-09-28): Vertical
+    // stacks hardware groups top-to-bottom (the original look);
+    // Horizontal lays the groups out side by side as columns, left to
+    // right in _hardwareOrder - sensors inside each group still stack
+    // vertically either way, only the groups themselves change
+    // direction. Gadget-wide (sensorGadget.GroupLayout), shared by Mini
+    // and Full, and in ThemeProfileManager.ThemeKeys since it's a
+    // portable style choice. See ComputeGroupColumns for the column
+    // geometry, which ComputeDefaultWidth/ComputeContentHeight/OnPaint
+    // all go through so they can't disagree.
+    private enum GroupLayoutMode
+    {
+        Vertical,
+        Horizontal
+    }
+
+    private GroupLayoutMode _groupLayout;
+    private readonly ToolStripMenuItem _groupLayoutMenu = new ToolStripMenuItem("Group Layout");
+
+    private static GroupLayoutMode GetGroupLayoutMode(PersistentSettings settings)
+    {
+        string raw = settings.GetValue("sensorGadget.GroupLayout", nameof(GroupLayoutMode.Vertical));
+        return Enum.TryParse(raw, out GroupLayoutMode mode) ? mode : GroupLayoutMode.Vertical;
+    }
 
     private Font _largeFont;
     private Font _smallFont;
@@ -541,6 +569,22 @@ public class SensorGadget : Gadget
             }
         };
         layoutMenu.DropDownItems.Add(_groupSpacingItem);
+
+        _groupLayout = GetGroupLayoutMode(settings);
+        foreach (GroupLayoutMode value in new[] { GroupLayoutMode.Vertical, GroupLayoutMode.Horizontal })
+        {
+            ToolStripMenuItem item = new ToolStripMenuItem(value.ToString()) { Checked = _groupLayout == value, Tag = value };
+            item.Click += delegate
+            {
+                if (_groupLayout == value)
+                    return;
+
+                settings.SetValue("sensorGadget.GroupLayout", value.ToString());
+                SetGroupLayout(value);
+            };
+            _groupLayoutMenu.DropDownItems.Add(item);
+        }
+        layoutMenu.DropDownItems.Add(_groupLayoutMenu);
 
         for (int i = 0; i < 5; i++)
         {
@@ -1409,9 +1453,9 @@ public class SensorGadget : Gadget
 
     private ISensor FindSensorAt(Point location)
     {
-        foreach ((ISensor sensor, int top, int bottom) in _rowBounds)
+        foreach ((ISensor sensor, int left, int top, int right, int bottom) in _rowBounds)
         {
-            if (location.Y >= top && location.Y < bottom)
+            if (location.X >= left && location.X < right && location.Y >= top && location.Y < bottom)
                 return sensor;
         }
 
@@ -1438,8 +1482,9 @@ public class SensorGadget : Gadget
         if (_contextMenuHardware != null)
         {
             int hwIndex = _hardwareOrder.IndexOf(_contextMenuHardware);
-            _moveGroupUpItem.Text = "Move \"" + _contextMenuHardware.Name + "\" Up";
-            _moveGroupDownItem.Text = "Move \"" + _contextMenuHardware.Name + "\" Down";
+            bool horizontal = _groupLayout == GroupLayoutMode.Horizontal;
+            _moveGroupUpItem.Text = "Move \"" + _contextMenuHardware.Name + "\" " + (horizontal ? "Left" : "Up");
+            _moveGroupDownItem.Text = "Move \"" + _contextMenuHardware.Name + "\" " + (horizontal ? "Right" : "Down");
             _moveGroupUpItem.Enabled = hwIndex > 0;
             _moveGroupDownItem.Enabled = hwIndex >= 0 && hwIndex < _hardwareOrder.Count - 1;
 
@@ -1585,9 +1630,9 @@ public class SensorGadget : Gadget
 
     private IHardware FindHardwareHeaderAt(Point location)
     {
-        foreach ((IHardware hardware, int top, int bottom) in _hardwareHeaderBounds)
+        foreach ((IHardware hardware, int left, int top, int right, int bottom) in _hardwareHeaderBounds)
         {
-            if (location.Y >= top && location.Y < bottom)
+            if (location.X >= left && location.X < right && location.Y >= top && location.Y < bottom)
                 return hardware;
         }
 
@@ -1837,6 +1882,30 @@ public class SensorGadget : Gadget
         _rowIconMode = GetRowIconMode(_settings);
         SyncCheckedByTag(_rowIconsMenu, _rowIconMode);
 
+        GroupLayoutMode importedLayout = GetGroupLayoutMode(_settings);
+        if (importedLayout != _groupLayout)
+            SetGroupLayout(importedLayout);
+
+        Resize();
+        Redraw();
+    }
+
+    // Fork addition (Group Layout): switching orientation also drops a
+    // manually dragged width back to auto-fit - a width tuned for one
+    // tall column is nowhere near right for several side-by-side ones
+    // (or vice versa), and keeping it would squash or stretch every
+    // column until the user re-dragged. Row spacing (lineSpacingExtra)
+    // is kept: it's per-row density, meaningful in either orientation.
+    private void SetGroupLayout(GroupLayoutMode mode)
+    {
+        _groupLayout = mode;
+        SyncCheckedByTag(_groupLayoutMenu, mode);
+        if (_widthManuallySet)
+        {
+            _widthManuallySet = false;
+            _settings.SetValue("sensorGadget.widthConfigured", false);
+        }
+        DebugLog.Write("Layout", $"SetGroupLayout: {mode}");
         Resize();
         Redraw();
     }
@@ -1923,36 +1992,139 @@ public class SensorGadget : Gadget
     // _widthManuallySet.
     private int ComputeDefaultWidth(double scaledFontSize)
     {
+        int minimumWidth = (int)Math.Round(17.3 * scaledFontSize);
         using (Bitmap b = new Bitmap(1, 1))
         using (Graphics g = Graphics.FromImage(b))
         {
-            float numberWidth = g.MeasureString("100 %", _smallFont, int.MaxValue, StringFormat.GenericTypographic).Width;
-            int rightSideWidth = Math.Max((int)Math.Ceiling(numberWidth), _progressWidth) + _rightMargin;
-
-            float longestNameWidth = 6 * (float)scaledFontSize;
-            foreach (IHardware hardware in _hardwareOrder)
+            if (_groupLayout == GroupLayoutMode.Horizontal && HasAnyDisplayedSensor())
             {
-                IReadOnlyList<ISensor> list = GetDisplayedSensors(hardware);
-                if (list.Count == 0)
-                    continue;
-
-                if (HardwareNamesEnabled)
-                    longestNameWidth = Math.Max(longestNameWidth, g.MeasureString(hardware.Name, _largeFont, int.MaxValue, StringFormat.GenericTypographic).Width);
-
-                foreach (ISensor sensor in list)
-                    longestNameWidth = Math.Max(longestNameWidth, g.MeasureString(ResolveSensorDisplayName(_settings, sensor), _smallFont, int.MaxValue, StringFormat.GenericTypographic).Width);
+                List<(IHardware Hardware, IReadOnlyList<ISensor> Sensors)> groups = GetDisplayedGroups();
+                int total = groups.Sum(group => MeasureNaturalWidth(g, scaledFontSize, new[] { group }));
+                total -= (groups.Count - 1) * (_leftMargin + _rightMargin - GroupColumnGap);
+                return Math.Max(minimumWidth, total);
             }
 
-            // Fork addition (Row Icons): only the first sensor row of each
-            // group gets a device icon, sized from the row text's actual
-            // measured ink height (see MeasureTextInk/ComputeRowIconSize)
-            // - always smaller than _iconSize (the header row's icon,
-            // sized for its taller _hardwareLineHeight) - so the single
-            // _iconSize allowance below already covers it too, no extra
-            // needed.
-            int nameSideWidth = _leftMargin + _iconSize + (int)Math.Ceiling(longestNameWidth) + 4;
-            return Math.Max((int)Math.Round(17.3 * scaledFontSize), rightSideWidth + nameSideWidth);
+            return Math.Max(minimumWidth, MeasureNaturalWidth(g, scaledFontSize, GetDisplayedGroups()));
         }
+    }
+
+    // The auto-fit width of a single column holding the given groups,
+    // including both side margins - the whole gadget in Vertical mode, or
+    // one group's column in Horizontal (see ComputeGroupColumns).
+    private int MeasureNaturalWidth(Graphics g, double scaledFontSize, IEnumerable<(IHardware Hardware, IReadOnlyList<ISensor> Sensors)> groups)
+    {
+        float numberWidth = g.MeasureString("100 %", _smallFont, int.MaxValue, StringFormat.GenericTypographic).Width;
+        int rightSideWidth = Math.Max((int)Math.Ceiling(numberWidth), _progressWidth) + _rightMargin;
+
+        float longestNameWidth = 6 * (float)scaledFontSize;
+        foreach ((IHardware hardware, IReadOnlyList<ISensor> list) in groups)
+        {
+            if (HardwareNamesEnabled)
+                longestNameWidth = Math.Max(longestNameWidth, g.MeasureString(hardware.Name, _largeFont, int.MaxValue, StringFormat.GenericTypographic).Width);
+
+            foreach (ISensor sensor in list)
+                longestNameWidth = Math.Max(longestNameWidth, g.MeasureString(ResolveSensorDisplayName(_settings, sensor), _smallFont, int.MaxValue, StringFormat.GenericTypographic).Width);
+        }
+
+        // Fork addition (Row Icons): only the first sensor row of each
+        // group gets a device icon, sized from the row text's actual
+        // measured ink height (see MeasureTextInk/ComputeRowIconSize)
+        // - always smaller than _iconSize (the header row's icon,
+        // sized for its taller _hardwareLineHeight) - so the single
+        // _iconSize allowance below already covers it too, no extra
+        // needed.
+        int nameSideWidth = _leftMargin + _iconSize + (int)Math.Ceiling(longestNameWidth) + 4;
+        return rightSideWidth + nameSideWidth;
+    }
+
+    private List<(IHardware Hardware, IReadOnlyList<ISensor> Sensors)> GetDisplayedGroups()
+    {
+        List<(IHardware, IReadOnlyList<ISensor>)> groups = new List<(IHardware, IReadOnlyList<ISensor>)>();
+        foreach (IHardware hardware in _hardwareOrder)
+        {
+            IReadOnlyList<ISensor> list = GetDisplayedSensors(hardware);
+            if (list.Count > 0)
+                groups.Add((hardware, list));
+        }
+
+        return groups;
+    }
+
+    // Fork addition (Group Layout, Horizontal mode) ---------------------
+
+    private struct GroupColumn
+    {
+        public IHardware Hardware;
+        public IReadOnlyList<ISensor> Sensors;
+
+        // Left/Right: the column's span in window coordinates, laid out
+        // as if it were its own full-width gadget - i.e. including a
+        // _leftMargin/_rightMargin on each side - so PaintGroup's x math
+        // works unchanged. Neighboring columns overlap in those margins
+        // (see ComputeGroupColumns), so the visible gap between two
+        // columns' content is exactly GroupColumnGap.
+        public int Left;
+        public int Right;
+
+        // HitLeft/HitRight: the right-click hit range, split at the middle
+        // of each gap so there's no dead zone between columns.
+        public int HitLeft;
+        public int HitRight;
+    }
+
+    // Space between one column's content and the next. Group Spacing's
+    // extra pixels apply here in Horizontal mode (between columns),
+    // the same way they add vertical space between groups in Vertical.
+    private int GroupColumnGap => Math.Max(0, (int)Math.Round(1.2 * _scaledFontSize) + _groupSpacingExtra);
+
+    // Each group's column gets its own natural (auto-fit) width, so a
+    // group with short names doesn't waste space just because another
+    // group has long ones. When the gadget is wider or narrower than the
+    // sum of those (a dragged width, or the gadget-wide minimum), the
+    // difference is split evenly across columns.
+    private List<GroupColumn> ComputeGroupColumns(int totalWidth)
+    {
+        List<(IHardware Hardware, IReadOnlyList<ISensor> Sensors)> groups = GetDisplayedGroups();
+        List<GroupColumn> columns = new List<GroupColumn>(groups.Count);
+        if (groups.Count == 0)
+            return columns;
+
+        int overlap = _leftMargin + _rightMargin - GroupColumnGap;
+        int[] widths = new int[groups.Count];
+        using (Bitmap b = new Bitmap(1, 1))
+        using (Graphics g = Graphics.FromImage(b))
+        {
+            for (int i = 0; i < groups.Count; i++)
+                widths[i] = MeasureNaturalWidth(g, _scaledFontSize, new[] { groups[i] });
+        }
+
+        int naturalTotal = widths.Sum() - (groups.Count - 1) * overlap;
+        int difference = totalWidth - naturalTotal;
+        int minimumColumnWidth = _leftMargin + _rightMargin + 1;
+        for (int i = 0; i < widths.Length; i++)
+        {
+            int share = difference / widths.Length + (i == widths.Length - 1 ? difference % widths.Length : 0);
+            widths[i] = Math.Max(minimumColumnWidth, widths[i] + share);
+        }
+
+        int left = 0;
+        for (int i = 0; i < groups.Count; i++)
+        {
+            columns.Add(new GroupColumn { Hardware = groups[i].Hardware, Sensors = groups[i].Sensors, Left = left, Right = left + widths[i] });
+            left += widths[i] - overlap;
+        }
+
+        for (int i = 0; i < columns.Count; i++)
+        {
+            GroupColumn column = columns[i];
+            column.HitLeft = i == 0 ? 0 : columns[i - 1].HitRight;
+            column.HitRight = i == columns.Count - 1
+                ? Math.Max(totalWidth, column.Right)
+                : (column.Right - _rightMargin + columns[i + 1].Left + _leftMargin) / 2;
+            columns[i] = column;
+        }
+
+        return columns;
     }
 
     private void SetFontColor(Color color)
@@ -2539,6 +2711,40 @@ public class SensorGadget : Gadget
         // is a no-op for that case.
         extraPerStep = Math.Max(-(_sensorLineHeight - 2), extraPerStep);
 
+        // Fork addition (Group Layout): side-by-side columns each start at
+        // _topMargin, so the gadget is as tall as its tallest column, and
+        // that column's rows are the "steps" vertical drag-to-resize
+        // spreads extra spacing over. The column with the most rows is
+        // the tallest at any extraPerStep (every column has the same
+        // header/row heights), so SnapHeightToRowSpacing and the
+        // UserResized handler always agree on which column that is.
+        if (_groupLayout == GroupLayoutMode.Horizontal && HasAnyDisplayedSensor())
+        {
+            int tallest = 0;
+            int tallestSteps = 0;
+            foreach ((IHardware _, IReadOnlyList<ISensor> list) in GetDisplayedGroups())
+            {
+                int columnHeight = _topMargin;
+                int columnSteps = 0;
+                if (HardwareNamesEnabled)
+                {
+                    columnHeight += _hardwareLineHeight + extraPerStep;
+                    columnSteps++;
+                }
+                columnHeight += list.Count * (_sensorLineHeight + extraPerStep);
+                columnSteps += list.Count;
+
+                if (columnSteps > tallestSteps)
+                {
+                    tallest = columnHeight;
+                    tallestSteps = columnSteps;
+                }
+            }
+
+            stepCount = tallestSteps;
+            return tallest + _bottomMargin;
+        }
+
         int y = _topMargin;
         int steps = 0;
 
@@ -3024,148 +3230,35 @@ public class SensorGadget : Gadget
                              new Rectangle(x, y - 1, w - RightBorder - x, 0));
             }
 
-            foreach (IHardware hardware in _hardwareOrder)
+            if (_groupLayout == GroupLayoutMode.Horizontal)
             {
-                IReadOnlyList<ISensor> list = GetDisplayedSensors(hardware);
-                if (list.Count == 0)
-                    continue;
-
-                bool isFirstSensorInGroup = true;
-
-                // Fork addition (Group Spacing) - mirrors
-                // ComputeContentHeight's identical addition exactly, see
-                // its comment.
-                if (y > _topMargin)
-                    y += _groupSpacingExtra;
-
-                if (HardwareNamesEnabled)
+                // Fork addition (Group Layout): each group paints as its
+                // own column, translated so PaintGroup's x math (written
+                // for a single full-width column spanning 0..w) applies
+                // unchanged - every column starts back at _topMargin,
+                // which is also what makes PaintGroup's "y > _topMargin"
+                // inter-group gaps correctly no-ops here.
+                int maxY = y;
+                foreach (GroupColumn column in ComputeGroupColumns(w))
                 {
-                    if (y > _topMargin)
-                        y += _hardwareLineHeight - _sensorLineHeight + extraPerStep;
-
-                    int headerTop = y;
-                    x = LeftBorder + 1;
-                    g.DrawImage(HardwareTypeImage.Instance.GetImage(hardware.HardwareType), new Rectangle(x, y + 1, _iconSize, _iconSize));
-                    x += _iconSize + 1;
-                    // Fork fix (round-5 investigation): was _stringFormat,
-                    // which has no Trimming set - a hardware name too long
-                    // for the current width was hard-clipped mid-character
-                    // with no "..." indicator, unlike the per-sensor display
-                    // name below which already uses _trimStringFormat. User
-                    // reported this as "text gets cropped" after a manual
-                    // width drag left less room than the full hardware name
-                    // needs.
-                    g.DrawString(hardware.Name, _largeFont, _textBrush, new Rectangle(x, y - 1, w - RightBorder - x, 0), _trimStringFormat);
-                    y += _hardwareLineHeight + extraPerStep;
-                    _hardwareHeaderBounds.Add((hardware, headerTop, y));
+                    int columnY = _topMargin;
+                    GraphicsState state = g.Save();
+                    g.TranslateTransform(column.Left, 0);
+                    PaintGroup(g, column.Hardware, column.Sensors, column.Right - column.Left, column.HitLeft, column.HitRight, ref columnY, extraPerStep);
+                    g.Restore(state);
+                    maxY = Math.Max(maxY, columnY);
                 }
-
-                foreach (ISensor sensor in list)
+                y = maxY;
+            }
+            else
+            {
+                foreach (IHardware hardware in _hardwareOrder)
                 {
-                    _rowBounds.Add((sensor, y, y + _sensorLineHeight + extraPerStep));
+                    IReadOnlyList<ISensor> list = GetDisplayedSensors(hardware);
+                    if (list.Count == 0)
+                        continue;
 
-                    int remainingWidth;
-
-                    // Fork addition (Value Display): bar-capable sensor
-                    // types used to always render as a bar with no
-                    // number at all; "Value Display" on the sensor's
-                    // context menu now lets each one show its number
-                    // instead ("Percent"), or both together ("Both") -
-                    // see IsBarCapableSensorType and
-                    // SensorGadgetItemSettings.GetValueDisplayMode. Every
-                    // other sensor type keeps rendering as a number only,
-                    // same as always (forced to Percent below since
-                    // GetValueDisplayMode is meaningless for them).
-                    bool isBarCapable = IsBarCapableSensorType(sensor.SensorType) && sensor.Value.HasValue;
-                    ValueDisplayMode displayMode = isBarCapable
-                        ? SensorGadgetItemSettings.GetValueDisplayMode(_settings, sensor)
-                        : ValueDisplayMode.Percent;
-
-                    if (!isBarCapable || displayMode == ValueDisplayMode.Percent)
-                    {
-                        string formatted = FormatSensorValue(sensor);
-
-                        // Fork addition (Phase 2/3 + Text Color): the value
-                        // text follows ResolveSensorTextColor - an explicit
-                        // per-sensor override if set, else the same
-                        // resolved bar/gradient color as before - the
-                        // numeric counterpart to DrawProgress below.
-                        Brush valueBrush = sensor.Value.HasValue ? GetColorBrush(ResolveSensorTextColor(sensor)) : _textBrush;
-                        g.DrawString(formatted, _smallFont, valueBrush, new RectangleF(-1, y - 1, w - _rightMargin + 3, 0), _alignRightStringFormat);
-
-                        remainingWidth = w - (int)Math.Floor(g.MeasureString(formatted, _smallFont, w, StringFormat.GenericTypographic).Width) - _rightMargin;
-                    }
-                    else if (displayMode == ValueDisplayMode.Bar)
-                    {
-                        DrawProgress(g, w - _progressWidth - _rightMargin, y + 0.35f * _sensorLineHeight, _progressWidth, 0.6f * _sensorLineHeight, 0.01f * sensor.Value.Value, ResolveSensorColor(sensor));
-                        remainingWidth = w - _progressWidth - _rightMargin;
-                    }
-                    else
-                    {
-                        // Both: the bar is drawn in its usual "Bar" mode
-                        // spot, then the number is layered on top of it,
-                        // right-aligned at the exact same column "Percent"
-                        // mode uses - so every sensor's number lines up in
-                        // the same column regardless of display mode, with
-                        // the bar visible behind it. Text Color exists
-                        // specifically so the number stays legible over
-                        // the bar underneath it.
-                        string formatted = FormatSensorValue(sensor);
-                        int barX = w - _progressWidth - _rightMargin;
-
-                        DrawProgress(g, barX, y + 0.35f * _sensorLineHeight, _progressWidth, 0.6f * _sensorLineHeight, 0.01f * sensor.Value.Value, ResolveSensorColor(sensor));
-                        g.DrawString(formatted, _smallFont, GetColorBrush(ResolveSensorTextColor(sensor)), new RectangleF(-1, y - 1, w - _rightMargin + 3, 0), _alignRightStringFormat);
-
-                        remainingWidth = barX;
-                    }
-
-                    int nameX = _leftMargin;
-
-                    // Fork addition (Row Icons): the device icon marks
-                    // only the first row of each hardware group - not
-                    // every row - so it reads as a group marker rather
-                    // than repeated clutter. "First" is positional
-                    // (isFirstSensorInGroup, reset per hardware group
-                    // below), not tied to a specific sensor identity, so
-                    // it automatically follows whichever sensor Move Up/
-                    // Move Down has sorted to the top of list via
-                    // gadget.order - no separate tracking needed.
-                    //
-                    // The name column's X shift below is unconditional
-                    // (applied whenever Row Icons is on at all, not just on
-                    // the row that actually draws one) - user-reported: a
-                    // shift only on the icon row left every other row's
-                    // name flush left instead, misaligning the whole
-                    // column. Reserving the same icon-width gap on every
-                    // row keeps names lined up whether or not that
-                    // particular row has an icon.
-                    if (_rowIconMode != RowIconMode.Off)
-                    {
-                        int rowIconSize;
-                        if (isFirstSensorInGroup)
-                        {
-                            (rowIconSize, int iconY) = ComputeRowIconLayout(y);
-                            g.DrawImage(HardwareTypeImage.Instance.GetImage(hardware.HardwareType), new Rectangle(nameX - 1, iconY, rowIconSize, rowIconSize));
-                        }
-                        else
-                        {
-                            rowIconSize = ComputeRowIconSize();
-                        }
-                        nameX += rowIconSize + 1;
-                    }
-
-                    // Icons Only: the device icon replaces the name on the
-                    // one row that has it; every other row in the group is
-                    // left with no name and no icon at all (user's explicit
-                    // choice - rows after the first aren't meant to be
-                    // individually identified in this mode).
-                    remainingWidth -= nameX - _leftMargin + 2;
-                    if (remainingWidth > 0 && _rowIconMode != RowIconMode.IconsOnly)
-                    {
-                        g.DrawString(ResolveSensorDisplayName(_settings, sensor), _smallFont, GetColorBrush(ResolveSensorNameColor(sensor)), new RectangleF(nameX - 1, y - 1, remainingWidth, 0), _trimStringFormat);
-                    }
-                    y += _sensorLineHeight + extraPerStep;
-                    isFirstSensorInGroup = false;
+                    PaintGroup(g, hardware, list, w, 0, w, ref y, extraPerStep);
                 }
             }
 
@@ -3195,6 +3288,156 @@ public class SensorGadget : Gadget
             // previously silent, so there was no way to tell whether it
             // was ever actually firing.
             DebugLog.Write("Resize", $"OnPaint: caught ArgumentException (frame drawing stopped here) - {ex.Message}\n{ex.StackTrace}");
+        }
+    }
+
+    // One hardware group's header (if Hardware Names is on) and sensor
+    // rows, drawn in a column spanning x = 0..w of whatever transform the
+    // caller set up (the whole gadget in Vertical mode, one translated
+    // column in Horizontal - see OnPaint), advancing y past what it drew.
+    // hitLeft/hitRight are the column's right-click hit range in window
+    // coordinates for _rowBounds/_hardwareHeaderBounds - untranslated,
+    // since ContextMenuOpening's point is window-relative. Split out of
+    // OnPaint's group loop when Group Layout was added; the body is the
+    // same code that loop always ran.
+    private void PaintGroup(Graphics g, IHardware hardware, IReadOnlyList<ISensor> list, int w, int hitLeft, int hitRight, ref int y, int extraPerStep)
+    {
+        bool isFirstSensorInGroup = true;
+
+        // Fork addition (Group Spacing) - mirrors
+        // ComputeContentHeight's identical addition exactly, see
+        // its comment.
+        if (y > _topMargin)
+            y += _groupSpacingExtra;
+
+        if (HardwareNamesEnabled)
+        {
+            if (y > _topMargin)
+                y += _hardwareLineHeight - _sensorLineHeight + extraPerStep;
+
+            int headerTop = y;
+            int x = LeftBorder + 1;
+            g.DrawImage(HardwareTypeImage.Instance.GetImage(hardware.HardwareType), new Rectangle(x, y + 1, _iconSize, _iconSize));
+            x += _iconSize + 1;
+            // Fork fix (round-5 investigation): was _stringFormat,
+            // which has no Trimming set - a hardware name too long
+            // for the current width was hard-clipped mid-character
+            // with no "..." indicator, unlike the per-sensor display
+            // name below which already uses _trimStringFormat. User
+            // reported this as "text gets cropped" after a manual
+            // width drag left less room than the full hardware name
+            // needs.
+            g.DrawString(hardware.Name, _largeFont, _textBrush, new Rectangle(x, y - 1, w - RightBorder - x, 0), _trimStringFormat);
+            y += _hardwareLineHeight + extraPerStep;
+            _hardwareHeaderBounds.Add((hardware, hitLeft, headerTop, hitRight, y));
+        }
+
+        foreach (ISensor sensor in list)
+        {
+            _rowBounds.Add((sensor, hitLeft, y, hitRight, y + _sensorLineHeight + extraPerStep));
+
+            int remainingWidth;
+
+            // Fork addition (Value Display): bar-capable sensor
+            // types used to always render as a bar with no
+            // number at all; "Value Display" on the sensor's
+            // context menu now lets each one show its number
+            // instead ("Percent"), or both together ("Both") -
+            // see IsBarCapableSensorType and
+            // SensorGadgetItemSettings.GetValueDisplayMode. Every
+            // other sensor type keeps rendering as a number only,
+            // same as always (forced to Percent below since
+            // GetValueDisplayMode is meaningless for them).
+            bool isBarCapable = IsBarCapableSensorType(sensor.SensorType) && sensor.Value.HasValue;
+            ValueDisplayMode displayMode = isBarCapable
+                ? SensorGadgetItemSettings.GetValueDisplayMode(_settings, sensor)
+                : ValueDisplayMode.Percent;
+
+            if (!isBarCapable || displayMode == ValueDisplayMode.Percent)
+            {
+                string formatted = FormatSensorValue(sensor);
+
+                // Fork addition (Phase 2/3 + Text Color): the value
+                // text follows ResolveSensorTextColor - an explicit
+                // per-sensor override if set, else the same
+                // resolved bar/gradient color as before - the
+                // numeric counterpart to DrawProgress below.
+                Brush valueBrush = sensor.Value.HasValue ? GetColorBrush(ResolveSensorTextColor(sensor)) : _textBrush;
+                g.DrawString(formatted, _smallFont, valueBrush, new RectangleF(-1, y - 1, w - _rightMargin + 3, 0), _alignRightStringFormat);
+
+                remainingWidth = w - (int)Math.Floor(g.MeasureString(formatted, _smallFont, w, StringFormat.GenericTypographic).Width) - _rightMargin;
+            }
+            else if (displayMode == ValueDisplayMode.Bar)
+            {
+                DrawProgress(g, w - _progressWidth - _rightMargin, y + 0.35f * _sensorLineHeight, _progressWidth, 0.6f * _sensorLineHeight, 0.01f * sensor.Value.Value, ResolveSensorColor(sensor));
+                remainingWidth = w - _progressWidth - _rightMargin;
+            }
+            else
+            {
+                // Both: the bar is drawn in its usual "Bar" mode
+                // spot, then the number is layered on top of it,
+                // right-aligned at the exact same column "Percent"
+                // mode uses - so every sensor's number lines up in
+                // the same column regardless of display mode, with
+                // the bar visible behind it. Text Color exists
+                // specifically so the number stays legible over
+                // the bar underneath it.
+                string formatted = FormatSensorValue(sensor);
+                int barX = w - _progressWidth - _rightMargin;
+
+                DrawProgress(g, barX, y + 0.35f * _sensorLineHeight, _progressWidth, 0.6f * _sensorLineHeight, 0.01f * sensor.Value.Value, ResolveSensorColor(sensor));
+                g.DrawString(formatted, _smallFont, GetColorBrush(ResolveSensorTextColor(sensor)), new RectangleF(-1, y - 1, w - _rightMargin + 3, 0), _alignRightStringFormat);
+
+                remainingWidth = barX;
+            }
+
+            int nameX = _leftMargin;
+
+            // Fork addition (Row Icons): the device icon marks
+            // only the first row of each hardware group - not
+            // every row - so it reads as a group marker rather
+            // than repeated clutter. "First" is positional
+            // (isFirstSensorInGroup, reset per hardware group
+            // below), not tied to a specific sensor identity, so
+            // it automatically follows whichever sensor Move Up/
+            // Move Down has sorted to the top of list via
+            // gadget.order - no separate tracking needed.
+            //
+            // The name column's X shift below is unconditional
+            // (applied whenever Row Icons is on at all, not just on
+            // the row that actually draws one) - user-reported: a
+            // shift only on the icon row left every other row's
+            // name flush left instead, misaligning the whole
+            // column. Reserving the same icon-width gap on every
+            // row keeps names lined up whether or not that
+            // particular row has an icon.
+            if (_rowIconMode != RowIconMode.Off)
+            {
+                int rowIconSize;
+                if (isFirstSensorInGroup)
+                {
+                    (rowIconSize, int iconY) = ComputeRowIconLayout(y);
+                    g.DrawImage(HardwareTypeImage.Instance.GetImage(hardware.HardwareType), new Rectangle(nameX - 1, iconY, rowIconSize, rowIconSize));
+                }
+                else
+                {
+                    rowIconSize = ComputeRowIconSize();
+                }
+                nameX += rowIconSize + 1;
+            }
+
+            // Icons Only: the device icon replaces the name on the
+            // one row that has it; every other row in the group is
+            // left with no name and no icon at all (user's explicit
+            // choice - rows after the first aren't meant to be
+            // individually identified in this mode).
+            remainingWidth -= nameX - _leftMargin + 2;
+            if (remainingWidth > 0 && _rowIconMode != RowIconMode.IconsOnly)
+            {
+                g.DrawString(ResolveSensorDisplayName(_settings, sensor), _smallFont, GetColorBrush(ResolveSensorNameColor(sensor)), new RectangleF(nameX - 1, y - 1, remainingWidth, 0), _trimStringFormat);
+            }
+            y += _sensorLineHeight + extraPerStep;
+            isFirstSensorInGroup = false;
         }
     }
 
