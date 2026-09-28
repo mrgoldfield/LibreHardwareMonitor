@@ -151,6 +151,7 @@ namespace LibreHardwareMonitor.Windows.Forms.UI
             this.serverInterfacePortMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.authWebServerMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.helpMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.startupGuideMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.aboutMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.treeContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.saveFileDialog = new System.Windows.Forms.SaveFileDialog();
@@ -1055,10 +1056,20 @@ namespace LibreHardwareMonitor.Windows.Forms.UI
             // helpMenuItem
             //
             this.helpMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.startupGuideMenuItem,
             this.aboutMenuItem});
             this.helpMenuItem.Name = "helpMenuItem";
             this.helpMenuItem.Size = new System.Drawing.Size(44, 20);
             this.helpMenuItem.Text = "Help";
+            //
+            // startupGuideMenuItem
+            //
+            // Fork addition: reopens StartupGuideDialog on demand - see
+            // MainForm.StartupGuideMenuItem_Click.
+            this.startupGuideMenuItem.Name = "startupGuideMenuItem";
+            this.startupGuideMenuItem.Size = new System.Drawing.Size(107, 22);
+            this.startupGuideMenuItem.Text = "Startup Guide";
+            this.startupGuideMenuItem.Click += new System.EventHandler(this.StartupGuideMenuItem_Click);
             //
             // aboutMenuItem
             //
@@ -1191,6 +1202,7 @@ namespace LibreHardwareMonitor.Windows.Forms.UI
         private System.Windows.Forms.ToolStripMenuItem plotMenuItem;
         private Aga.Controls.Tree.NodeControls.NodeCheckBox nodeCheckBox;
         private System.Windows.Forms.ToolStripMenuItem helpMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem startupGuideMenuItem;
         private System.Windows.Forms.ToolStripMenuItem aboutMenuItem;
         private System.Windows.Forms.ToolStripMenuItem saveReportMenuItem;
         private System.Windows.Forms.ToolStripMenuItem optionsMenuItem;

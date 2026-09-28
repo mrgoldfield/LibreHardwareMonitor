@@ -563,6 +563,19 @@ public sealed partial class MainForm : Form
             Show();
         }
 
+        // Fork addition: the onboarding guide for the gadget's
+        // fork-specific features - see StartupGuideDialog. Skipped when
+        // starting minimized to the tray (minTrayMenuItem.Checked): a
+        // modal dialog would force the app into the foreground right
+        // after the user asked for a quiet, tray-only start, which
+        // defeats the point. Reachable any time afterward from
+        // Help -> Startup Guide regardless of this setting.
+        if (!minTrayMenuItem.Checked && _settings.GetValue("mainForm.showStartupGuide", true))
+        {
+            bool showOnStartup = StartupGuideDialog.Show(true);
+            _settings.SetValue("mainForm.showStartupGuide", showOnStartup);
+        }
+
         // Create a handle, otherwise calling Close() does not fire FormClosed
 
         // Make sure the settings are saved when the user logs off
@@ -1086,6 +1099,15 @@ public sealed partial class MainForm : Form
     private void AboutMenuItem_Click(object sender, EventArgs e)
     {
         _ = new AboutBox().ShowDialog();
+    }
+
+    // Fork addition: reopens the onboarding guide on demand, regardless
+    // of mainForm.showStartupGuide - that setting only controls whether
+    // it shows automatically at launch, not whether it's reachable.
+    private void StartupGuideMenuItem_Click(object sender, EventArgs e)
+    {
+        bool showOnStartup = StartupGuideDialog.Show(_settings.GetValue("mainForm.showStartupGuide", true));
+        _settings.SetValue("mainForm.showStartupGuide", showOnStartup);
     }
 
     private void TreeView_Click(object sender, EventArgs e)

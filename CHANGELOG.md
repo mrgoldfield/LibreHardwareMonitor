@@ -180,6 +180,19 @@ upstream LibreHardwareMonitor this fork started from.
   previously pointed back at this fork's own repo. Prompted by an audit
   ahead of making the repo public, to make sure upstream stays clearly
   credited and the fork's own additions stay easy to find.
+- **Startup Guide.** A short onboarding dialog (`StartupGuideDialog`)
+  listing the gadget's fork-specific features - how to add a sensor to
+  it, right-click for reordering/colors/alarms, double-click for
+  Mini/Full, drag to resize, and the background menu's Theme/Profile
+  export - shown once per launch. A "Show this guide on startup"
+  checkbox controls whether it keeps appearing (`mainForm.showStartupGuide`,
+  defaults to on); it's reachable any time afterward from Help → Startup
+  Guide regardless of that setting. Skipped when starting minimized to
+  the tray, since popping a modal dialog would defeat a quiet start.
+  Separate from `FirstActivationDialog` (which only ever covers the
+  one-time "what sensors go in the gadget" choice and can't be reopened).
+  Built and tested locally (both targets, 61/61) - not yet visually
+  reconfirmed.
 
 ### Fixed
 - Two dialogs (`GradientThresholdDialog`, `DisplayNameDialog`) had a
