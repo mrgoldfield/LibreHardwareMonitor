@@ -294,7 +294,7 @@ public sealed partial class MainForm : Form
         // opted in). UserOption.Changed's add-accessor invokes the
         // handler immediately on subscription (see UserOption.cs), so
         // this true default correctly cascades into showing the gadget
-        // and triggering FirstActivationDialog below on a fresh install,
+        // and applying the default sensor selection below on a fresh install,
         // the same as if the user had just checked "Show Gadget"
         // themselves.
         _showGadget = new UserOption("gadgetMenuItem", true, gadgetMenuItem, _settings);
@@ -320,16 +320,17 @@ public sealed partial class MainForm : Form
             {
                 _gadget.Visible = _showGadget.Value;
 
-                // Fork addition: prompt once, the first time the gadget
-                // is ever shown, instead of leaving a fresh install with
-                // an empty widget and no hint that sensors need to be
-                // added one at a time - see WidgetDefaultsApplier.
+                // Fork addition: the first time the gadget is ever shown,
+                // fill it with the default sensor selection instead of
+                // leaving a fresh install with an empty widget - see
+                // WidgetDefaultsApplier. Used to ask first ("Set Up the
+                // Gadget": Use Default Values / Start From Scratch); the
+                // prompt was dropped per user request 2026-09-28 since
+                // everything is editable afterward anyway.
                 if (_showGadget.Value && !_settings.GetValue("sensorGadget.hasBeenConfigured", false))
                 {
                     _settings.SetValue("sensorGadget.hasBeenConfigured", true);
-
-                    if (FirstActivationDialog.Show() == FirstActivationDialog.Result.UseDefaults)
-                        WidgetDefaultsApplier.Apply(WidgetDefaultSelections.Load(), _computer, _gadget);
+                    WidgetDefaultsApplier.Apply(WidgetDefaultSelections.Load(), _computer, _gadget);
                 }
             }
         };

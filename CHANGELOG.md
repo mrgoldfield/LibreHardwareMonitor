@@ -24,6 +24,16 @@ upstream LibreHardwareMonitor this fork started from.
   (`sensorGadget.GroupLayout`), shared by Mini and Full, and included in
   exported Themes. User-requested 2026-09-28.
 
+### Changed
+- **No more "Set Up the Gadget" prompt on first run.** The first time the
+  gadget is shown, it now fills with the default sensor selection
+  (CPU/RAM/disk usage, plus temperatures - editable in
+  `UserSettings\DefaultWidgetSelections.json`) straight away, instead of
+  asking "Use Default Values / Start From Scratch" first. Everything
+  stays editable afterward, and existing installs are unaffected (the
+  one-time `sensorGadget.hasBeenConfigured` flag is unchanged).
+  User-requested 2026-09-28.
+
 ## [0.9.7-gogogadget.6] - 2026-09-28 (alpha)
 
 First release build of the fork, published as a GitHub pre-release. Everything

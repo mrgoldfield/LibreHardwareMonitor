@@ -127,8 +127,8 @@ public sealed class GadgetWindow : NativeWindow, IDisposable
     // stick there the way AlwaysOnTop does. Needed because the gadget is
     // made visible early in MainForm's constructor (naturally front-most
     // at that instant, nothing else from this app is on screen yet), but
-    // MainForm.Show() and the modal FirstActivationDialog/StartupGuideDialog
-    // that follow it can each become the active window afterward and end
+    // MainForm.Show() and the modal StartupGuideDialog that follow it can
+    // each become the active window afterward and end
     // up stacked in front of it - see MainForm's constructor, which calls
     // this last, after all of those have already run.
     public void BringToFront()

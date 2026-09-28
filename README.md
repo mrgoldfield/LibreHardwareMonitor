@@ -10,7 +10,7 @@ GoGoGadget Hardware Monitor is a fork of [LibreHardwareMonitor](https://github.c
 
 The gadget you get from "Add to Full/Mini Gadget" now supports:
 
-- **Mini/Full modes** — double-click the gadget (or its "Mini Mode" checkbox) to switch between a small, curated sensor set and everything you've added. A sensor added to Mini is always shown in Full too. First time you ever show the gadget, you're offered a small default selection (CPU/RAM/disk usage, plus temperatures) instead of starting empty — fully editable in `UserSettings\DefaultWidgetSelections.json`.
+- **Mini/Full modes** — double-click the gadget (or its "Mini Mode" checkbox) to switch between a small, curated sensor set and everything you've added. A sensor added to Mini is always shown in Full too. The first time you ever show the gadget, it starts with a small default selection (CPU/RAM/disk usage, plus temperatures) instead of empty — fully editable in `UserSettings\DefaultWidgetSelections.json`.
 - **Reordering** — move a sensor up/down within its hardware block, or move a whole hardware block (CPU, GPU, RAM, ...) up/down relative to the others, instead of a fixed automatic order.
 - **Per-sensor bar color** — pick a color for any one sensor's bar, not just one color for the whole gadget.
 - **Alarm-level coloring** — set a warning/critical threshold per sensor; its bar recolors automatically when crossed. Defaults are suggested from the hardware's own reported safe limits where available.

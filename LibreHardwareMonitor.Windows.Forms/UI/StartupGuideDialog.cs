@@ -11,18 +11,17 @@ using LibreHardwareMonitor.Windows.Forms.Utilities;
 namespace LibreHardwareMonitor.Windows.Forms.UI;
 
 // Fork addition: a short onboarding screen for the gadget's fork-specific
-// features (reordering, colors, alarms, themes, ...), separate from
-// FirstActivationDialog (which only covers the one-time "what sensors go
-// in the gadget" choice). Shown once per app launch, gated by
-// MainForm's mainForm.showStartupGuide setting rather than a one-time
-// flag like FirstActivationDialog's, since the user can turn it back on
-// from the Help menu at any point rather than only ever seeing it once.
+// features (reordering, colors, alarms, themes, ...). Shown once per app
+// launch, gated by MainForm's mainForm.showStartupGuide setting rather
+// than a one-time flag like sensorGadget.hasBeenConfigured, since the
+// user can turn it back on from the Help menu at any point rather than
+// only ever seeing it once.
 internal static class StartupGuideDialog
 {
     // Caller (MainForm) persists mainForm.showStartupGuide from this -
     // this dialog never touches PersistentSettings itself, matching
     // every other dialog in this fork (GradientThresholdDialog,
-    // DisplayNameDialog, FirstActivationDialog).
+    // DisplayNameDialog, GroupSpacingDialog).
     public static bool Show(bool initiallyShowOnStartup)
     {
         using Form form = new Form

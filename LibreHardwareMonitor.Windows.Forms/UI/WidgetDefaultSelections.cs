@@ -12,8 +12,9 @@ using LibreHardwareMonitor.Windows.Forms.Utilities;
 
 namespace LibreHardwareMonitor.Windows.Forms.UI;
 
-// Fork addition: the starting sensor selection offered on first gadget
-// activation (see FirstActivationDialog), so a fresh install shows
+// Fork addition: the starting sensor selection applied automatically on
+// first gadget activation (see MainForm's _showGadget.Changed handler,
+// gated on sensorGadget.hasBeenConfigured), so a fresh install shows
 // something useful immediately instead of an empty gadget. Rules match
 // by hardware/sensor *type* and name, never a literal sensor Identifier
 // (those are machine-specific), and are read from an editable JSON file
