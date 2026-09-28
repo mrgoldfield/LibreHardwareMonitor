@@ -158,6 +158,15 @@ public class SensorGadget : Gadget
     private readonly ToolStripMenuItem _moveGroupDownItem = new ToolStripMenuItem("Move Group Down");
     private readonly ToolStripSeparator _sensorMenuSeparator = new ToolStripSeparator();
 
+    // Fork addition (menu redesign): breaks the per-sensor block into
+    // Move Up/Down, then appearance/content settings, then the
+    // destructive-ish Remove action - was one flat run of 9 items with
+    // no internal separators before. A distinct ToolStripSeparator
+    // instance per gap, since the same instance can't appear twice in
+    // one ContextMenuStrip.Items collection.
+    private readonly ToolStripSeparator _sensorMenuMoveSeparator = new ToolStripSeparator();
+    private readonly ToolStripSeparator _sensorMenuRemoveSeparator = new ToolStripSeparator();
+
     // Fork addition: a non-clickable header at the very top of the
     // per-row context menu naming exactly what's about to be modified -
     // deliberately the sensor's/hardware's real name (ISensor.Name/
@@ -438,8 +447,49 @@ public class SensorGadget : Gadget
             }
         };
 
+        // Fork addition (menu redesign, user-requested 2026-09-28): the
+        // gadget-wide section below groups related settings together -
+        // row labeling (Hardware Names/Row Icons), text/size appearance,
+        // background/bar appearance, layout mode, window behavior, then
+        // persistence actions - instead of the original flat, ungrouped
+        // list. "Hide/Show Main Window" moved to the very top per
+        // explicit follow-up, since it's a navigation action rather than
+        // a gadget setting and got lost at the bottom of a long menu.
+        // Note this is the top of the *gadget-wide* section specifically:
+        // when the right-click landed on a sensor row, UpdateSensorMenuItems
+        // inserts that row's own Device/Sensor/actions block above
+        // everything here (see its own grouping there), since those items
+        // need a specific sensor and can't live in this always-present
+        // section.
         ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
+        ToolStripMenuItem hideShowItem = new ToolStripMenuItem("Hide/Show Main Window");
+        contextMenuStrip.Items.Add(hideShowItem);
+        contextMenuStrip.Items.Add(new ToolStripSeparator());
+
         contextMenuStrip.Items.Add(_hardwareNamesItem);
+
+        _rowIconMode = GetRowIconMode(settings);
+        (RowIconMode value, string label)[] rowIconOptions =
+        {
+            (RowIconMode.Off, "Off"),
+            (RowIconMode.WithName, "Icons + Name"),
+            (RowIconMode.IconsOnly, "Icons Only")
+        };
+        foreach ((RowIconMode value, string label) in rowIconOptions)
+        {
+            ToolStripMenuItem item = new ToolStripMenuItem(label) { Checked = _rowIconMode == value, Tag = value };
+            item.Click += delegate
+            {
+                _rowIconMode = value;
+                settings.SetValue("sensorGadget.RowIcons", value.ToString());
+                SyncCheckedByTag(_rowIconsMenu, value);
+                Resize();
+            };
+            _rowIconsMenu.DropDownItems.Add(item);
+        }
+        contextMenuStrip.Items.Add(_rowIconsMenu);
+        contextMenuStrip.Items.Add(new ToolStripSeparator());
+
         for (int i = 0; i < 5; i++)
         {
             float size;
@@ -490,27 +540,6 @@ public class SensorGadget : Gadget
         }
         contextMenuStrip.Items.Add(_scaleMenu);
 
-        _rowIconMode = GetRowIconMode(settings);
-        (RowIconMode value, string label)[] rowIconOptions =
-        {
-            (RowIconMode.Off, "Off"),
-            (RowIconMode.WithName, "Icons + Name"),
-            (RowIconMode.IconsOnly, "Icons Only")
-        };
-        foreach ((RowIconMode value, string label) in rowIconOptions)
-        {
-            ToolStripMenuItem item = new ToolStripMenuItem(label) { Checked = _rowIconMode == value, Tag = value };
-            item.Click += delegate
-            {
-                _rowIconMode = value;
-                settings.SetValue("sensorGadget.RowIcons", value.ToString());
-                SyncCheckedByTag(_rowIconsMenu, value);
-                Resize();
-            };
-            _rowIconsMenu.DropDownItems.Add(item);
-        }
-        contextMenuStrip.Items.Add(_rowIconsMenu);
-
         Color fontColor = settings.GetValue("sensorGadget.FontColor", Color.White);
         SetFontColor(fontColor);
 
@@ -538,6 +567,7 @@ public class SensorGadget : Gadget
         };
         fontColorMenu.DropDownItems.Add(defaultFontColorItem);
         contextMenuStrip.Items.Add(fontColorMenu);
+        contextMenuStrip.Items.Add(new ToolStripSeparator());
 
         Color backgroundColor = settings.GetValue("sensorGadget.BackgroundColor", Color.FromArgb(0));
         SetBackgroundColor(backgroundColor);
@@ -575,6 +605,7 @@ public class SensorGadget : Gadget
         // back to the old look for anyone who preferred it.
         ToolStripMenuItem gradientBarBackgroundItem = new ToolStripMenuItem("Gradient Bar Background");
         contextMenuStrip.Items.Add(gradientBarBackgroundItem);
+        contextMenuStrip.Items.Add(new ToolStripSeparator());
 
         // Fork addition (Mini/Full gadget modes): Mini shows only
         // sensors explicitly marked for it (Add to Mini Gadget from the
@@ -583,9 +614,9 @@ public class SensorGadget : Gadget
         ToolStripMenuItem miniModeItem = new ToolStripMenuItem("Mini Mode");
         contextMenuStrip.Items.Add(miniModeItem);
         contextMenuStrip.Items.Add(new ToolStripSeparator());
+
         ToolStripMenuItem lockItem = new ToolStripMenuItem("Lock Position and Size");
         contextMenuStrip.Items.Add(lockItem);
-        contextMenuStrip.Items.Add(new ToolStripSeparator());
         ToolStripMenuItem alwaysOnTopItem = new ToolStripMenuItem("Always on Top");
         contextMenuStrip.Items.Add(alwaysOnTopItem);
         contextMenuStrip.Items.Add(_opacityMenu);
@@ -603,12 +634,12 @@ public class SensorGadget : Gadget
             };
             _opacityMenu.DropDownItems.Add(item);
         }
+        contextMenuStrip.Items.Add(new ToolStripSeparator());
 
         // Fork addition (Phase 5 - Theme & Profile export/import): see
         // ThemeProfileManager for the file format and the Theme/Profile
         // key split, and ApplyThemeFromSettings/ResortFromSettings for
         // how an import takes effect on the already-running gadget.
-        contextMenuStrip.Items.Add(new ToolStripSeparator());
         ToolStripMenuItem themeProfileMenu = new ToolStripMenuItem("Theme / Profile");
 
         ToolStripItem exportThemeItem = new ToolStripMenuItem("Export Theme...");
@@ -687,10 +718,6 @@ public class SensorGadget : Gadget
         };
         themeProfileMenu.DropDownItems.Add(importProfileItem);
         contextMenuStrip.Items.Add(themeProfileMenu);
-
-        contextMenuStrip.Items.Add(new ToolStripSeparator());
-        ToolStripMenuItem hideShowItem = new ToolStripMenuItem("Hide/Show Main Window");
-        contextMenuStrip.Items.Add(hideShowItem);
 
         ContextMenuStrip = contextMenuStrip;
 
@@ -1336,6 +1363,8 @@ public class SensorGadget : Gadget
         ContextMenuStrip.Items.Remove(_moveGroupUpItem);
         ContextMenuStrip.Items.Remove(_moveGroupDownItem);
         ContextMenuStrip.Items.Remove(_sensorMenuSeparator);
+        ContextMenuStrip.Items.Remove(_sensorMenuMoveSeparator);
+        ContextMenuStrip.Items.Remove(_sensorMenuRemoveSeparator);
         ContextMenuStrip.Items.Remove(_contextMenuDeviceItem);
         ContextMenuStrip.Items.Remove(_contextMenuSensorItem);
         ContextMenuStrip.Items.Remove(_contextMenuInfoSeparator);
@@ -1393,6 +1422,7 @@ public class SensorGadget : Gadget
 
         ContextMenuStrip.Items.Insert(0, _sensorMenuSeparator);
         ContextMenuStrip.Items.Insert(0, _removeFromWidgetItem);
+        ContextMenuStrip.Items.Insert(0, _sensorMenuRemoveSeparator);
         ContextMenuStrip.Items.Insert(0, _displayNameItem);
         if (isBarCapable)
             ContextMenuStrip.Items.Insert(0, _valueDisplayItem);
@@ -1400,6 +1430,7 @@ public class SensorGadget : Gadget
         ContextMenuStrip.Items.Insert(0, _nameColorItem);
         ContextMenuStrip.Items.Insert(0, _textColorItem);
         ContextMenuStrip.Items.Insert(0, _barColorItem);
+        ContextMenuStrip.Items.Insert(0, _sensorMenuMoveSeparator);
         ContextMenuStrip.Items.Insert(0, _moveDownItem);
         ContextMenuStrip.Items.Insert(0, _moveUpItem);
 

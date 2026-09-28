@@ -303,6 +303,31 @@ upstream LibreHardwareMonitor this fork started from.
   row height, so it doesn't end up hugging the top of a taller row. Built
   and tested locally (both targets, 61/61) - not yet visually reconfirmed.
 
+### Changed
+- **Right-click menu redesign.** The gadget-wide section (always present,
+  below the per-sensor block when a sensor row was right-clicked) used to
+  be one flat, ungrouped list in the order features happened to ship in -
+  Hardware Names, Font Size, Scale, Row Icons, Font Color, Background
+  Color, Gradient Bar Background, Mini Mode, then window-behavior/theme
+  items, with "Hide/Show Main Window" stranded at the very bottom.
+  Reorganized into labeled groups, separated visually: "Hide/Show Main
+  Window" first (a navigation action, not a gadget setting, moved to the
+  top per user feedback so it's not lost at the bottom of a long menu) -
+  Hardware Names + Row Icons together (both control what identifies a
+  row/group - the specific grouping the user asked for) - Font Size +
+  Scale + Font Color (text/icon rendering) - Background Color + Gradient
+  Bar Background (background/bar appearance) - Mini Mode - Lock Position
+  and Size + Always on Top + Opacity (window behavior, previously split
+  across three separate single-item sections) - Theme / Profile. The
+  per-sensor block (Device/Sensor header, Move Up/Down, colors, content,
+  Remove from Widget) similarly gained two internal separators (after
+  Move Down, and before Remove from Widget) instead of running all 9
+  items together with no breaks. Note "Display Name..." (per-sensor)
+  can't be grouped next to Hardware Names/Row Icons (gadget-wide) since
+  it needs a specific right-clicked sensor and only ever appears in the
+  per-sensor block. User-requested 2026-09-28. Built and tested locally
+  (both targets, 61/61) - not yet visually reconfirmed.
+
 ### Fixed
 - Two dialogs (`GradientThresholdDialog`, `DisplayNameDialog`) had a
   fixed-height instruction label that could overflow onto the input
