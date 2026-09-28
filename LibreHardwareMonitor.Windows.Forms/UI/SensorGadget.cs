@@ -276,6 +276,23 @@ public class SensorGadget : Gadget
         return Enum.TryParse(raw, out RowIconMode mode) ? mode : RowIconMode.Off;
     }
 
+    // Fork addition (Group Spacing, user-requested 2026-09-28): an
+    // optional extra gap, in raw pixels, drawn between each hardware
+    // group - on top of normal row spacing, and independent of the
+    // vertical drag-to-resize feature's per-row extraPerStep (which
+    // stretches every row/header step evenly; this instead adds a fixed
+    // amount only at each group boundary, whether or not Hardware Names
+    // is on - see the group loop in OnPaint/ComputeContentHeight, which
+    // must stay in sync with each other exactly like extraPerStep
+    // already does there). Deliberately excluded from
+    // ThemeProfileManager.ThemeKeys, same reasoning as
+    // lineSpacingExtra/widthConfigured: it's a raw pixel count tuned to
+    // this gadget's current size/scale, not a proportional style choice
+    // that would still look right after being copied onto a differently
+    // sized/scaled gadget.
+    private int _groupSpacingExtra;
+    private readonly ToolStripMenuItem _groupSpacingItem = new ToolStripMenuItem("Group Spacing...");
+
     private Font _largeFont;
     private Font _smallFont;
     private Brush _textBrush;
@@ -488,6 +505,26 @@ public class SensorGadget : Gadget
             _rowIconsMenu.DropDownItems.Add(item);
         }
         contextMenuStrip.Items.Add(_rowIconsMenu);
+
+        _groupSpacingExtra = settings.GetValue("sensorGadget.GroupSpacingExtra", 0);
+        _groupSpacingItem.Click += delegate
+        {
+            GroupSpacingDialog.Result result = GroupSpacingDialog.Show(_groupSpacingExtra, out int newValue);
+            switch (result)
+            {
+                case GroupSpacingDialog.Result.Save:
+                    _groupSpacingExtra = newValue;
+                    settings.SetValue("sensorGadget.GroupSpacingExtra", _groupSpacingExtra);
+                    Resize();
+                    break;
+                case GroupSpacingDialog.Result.Clear:
+                    _groupSpacingExtra = 0;
+                    settings.Remove("sensorGadget.GroupSpacingExtra");
+                    Resize();
+                    break;
+            }
+        };
+        contextMenuStrip.Items.Add(_groupSpacingItem);
         contextMenuStrip.Items.Add(new ToolStripSeparator());
 
         for (int i = 0; i < 5; i++)
@@ -2476,6 +2513,13 @@ public class SensorGadget : Gadget
             if (list.Count == 0)
                 continue;
 
+            // Fork addition (Group Spacing): a fixed gap between groups,
+            // independent of extraPerStep - not a "step" itself (doesn't
+            // count toward stepCount), since it's not something the
+            // vertical drag-to-resize feature stretches per-row.
+            if (y > _topMargin)
+                y += _groupSpacingExtra;
+
             if (HardwareNamesEnabled)
             {
                 if (y > _topMargin)
@@ -2845,6 +2889,12 @@ public class SensorGadget : Gadget
                     continue;
 
                 bool isFirstSensorInGroup = true;
+
+                // Fork addition (Group Spacing) - mirrors
+                // ComputeContentHeight's identical addition exactly, see
+                // its comment.
+                if (y > _topMargin)
+                    y += _groupSpacingExtra;
 
                 if (HardwareNamesEnabled)
                 {

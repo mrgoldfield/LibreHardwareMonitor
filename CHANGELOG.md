@@ -306,6 +306,24 @@ upstream LibreHardwareMonitor this fork started from.
   have pulled the icon down away from the text instead of keeping it
   beside it. Built and tested locally (both targets, 61/61) - not yet
   visually reconfirmed.
+- **Group Spacing.** Gadget right-click menu -> "Group Spacing..." opens a
+  small dialog to set an optional extra gap, in raw pixels, drawn between
+  each hardware group (CPU, RAM, Storage, ...) - on top of normal row
+  spacing. 0 (the default) means no change from before. Independent of
+  the existing vertical drag-to-resize feature's per-row spacing
+  (`extraPerStep`, which stretches every row/header step evenly): this is
+  a fixed amount added only at each group boundary, applied whether or
+  not Hardware Names is on, so groups stay visually separated even in the
+  flat/no-headers look. Gadget-wide (`sensorGadget.GroupSpacingExtra`),
+  deliberately excluded from the Theme-export allowlist
+  (`ThemeProfileManager.ThemeKeys`) - same reasoning as
+  `lineSpacingExtra`/`widthConfigured`: a raw pixel count tuned to this
+  gadget's current size/scale, not a proportional style choice that would
+  still look right after being copied onto a differently sized/scaled
+  gadget. New `GroupSpacingDialog.cs`, modeled on
+  `GradientThresholdDialog`/`DisplayNameDialog`. User-requested
+  2026-09-28. Built and tested locally (both targets, 62/62) - not yet
+  visually reconfirmed.
 
 ### Changed
 - **Right-click menu redesign.** The gadget-wide section (always present,
